@@ -5,4 +5,4 @@ authors = ["Josh <josue.eduardo206@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-futures = { vesion = "0.3", features = ["thread-pool"] }
+futures = { version = "0.3", features = ["thread-pool"] }
