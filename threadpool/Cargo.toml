@@ -1,0 +1,8 @@
+[package]
+name = "threadpool"
+version = "0.1.0"
+authors = ["Josh <josue.eduardo206@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures = { vesion = "0.3", features = ["thread-pool"] }
