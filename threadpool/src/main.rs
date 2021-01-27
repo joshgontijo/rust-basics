@@ -15,6 +15,12 @@ fn main() -> Result<(), std::io::Error> {
     Ok(())
 }
 
+/**
+Alternatively:
+let future = async {
+    ....
+}
+**/
 async fn do_async() -> i32 {
     sleep(Duration::from_secs(5));
     if let Some(name) = std::thread::current().name() { println!("DONE {}", name) }
