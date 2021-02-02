@@ -2,4 +2,5 @@
 members = [
  "threadpool",
  "modules",
+ "channels"
 ]
