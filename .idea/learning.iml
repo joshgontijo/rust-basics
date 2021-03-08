@@ -5,6 +5,10 @@
       <sourceFolder url="file://$MODULE_DIR$/modules/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/threadpool/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/channels/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/lifetime/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/log/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/scratch/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -3,5 +3,7 @@ members = [
  "threadpool",
  "modules",
  "channels",
- "lifetime"
+ "lifetime",
+ "log",
+ "scratch"
 ]
