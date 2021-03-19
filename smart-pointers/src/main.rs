@@ -9,7 +9,6 @@ mod tests {
     use std::cell::Cell;
     use std::rc::Rc;
 
-    use super::*;
 
     #[test]
     fn test_cell() {
@@ -56,7 +55,7 @@ mod tests {
         drop(a);
 
         assert!(ref_cell.try_borrow_mut().is_ok()); //OK - no immut or mut borrow are given at this point
-        let b = ref_cell.try_borrow_mut();
+        let _b = ref_cell.try_borrow_mut();
         assert!(!ref_cell.try_borrow_mut().is_ok()); //NOK - there is already a mut borrow (b)
     }
 
