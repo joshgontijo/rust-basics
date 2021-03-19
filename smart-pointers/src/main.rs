@@ -8,6 +8,7 @@ fn main() {}
 mod tests {
     use std::cell::Cell;
     use std::rc::Rc;
+    use std::borrow::Cow;
 
 
     #[test]
@@ -109,4 +110,9 @@ mod tests {
             // gets destroyed as well.
         }
     }
+
+    //Cow not added:
+    //Cow can have either a reference or a owned value
+    //if a mutation is required on a reference then it will copy the value into a owned and return the reference
+
 }
