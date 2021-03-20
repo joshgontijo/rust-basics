@@ -5,6 +5,5 @@ members = [
  "channels",
  "lifetime",
  "log",
- "scratch",
  "smart-pointers"
 ]
