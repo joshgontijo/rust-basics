@@ -4,6 +4,7 @@ members = [
  "modules",
  "channels",
  "lifetime",
+ "scratch",
  "log",
  "smart-pointers"
 ]
