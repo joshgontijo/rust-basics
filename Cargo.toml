@@ -7,5 +7,6 @@ members = [
  "scratch",
  "log",
  "smart-pointers",
- "error-handling"
+ "error-handling",
+ "rwlock-iterator"
 ]
