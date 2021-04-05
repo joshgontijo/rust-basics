@@ -8,5 +8,5 @@ members = [
  "log",
  "smart-pointers",
  "error-handling",
- "rwlock-iterator"
+ "flatten"
 ]
