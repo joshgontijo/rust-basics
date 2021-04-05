@@ -8,5 +8,6 @@ members = [
  "log",
  "smart-pointers",
  "error-handling",
- "flatten"
+ "flatten",
+ "actix-test",
 ]

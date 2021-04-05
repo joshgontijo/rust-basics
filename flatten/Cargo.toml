@@ -1,5 +1,5 @@
 [package]
-name = "rwlock-iterator"
+name = "flatten"
 version = "0.1.0"
 authors = ["josueeduardo <josue.eduardo206@gmail.com>"]
 edition = "2018"
