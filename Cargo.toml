@@ -9,5 +9,5 @@ members = [
  "smart-pointers",
  "error-handling",
  "flatten",
- "actix-test",
+ "closure"
 ]
