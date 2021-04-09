@@ -1,21 +1,36 @@
 use serde::{Deserialize, Serialize};
+use std::borrow::{Cow, Borrow, BorrowMut};
+use std::cell::{Cell, RefCell};
+use std::sync::Arc;
+use std::fs::File;
+use std::thread;
 
 fn main() {
-    let user = User { age: 31, value: 123 };
-    let mut result = bincode::serialize(&user).unwrap();
+    let mut data = Arc::new(vec![Arc::new(User::of(0))]);
 
-    result.append(&mut vec![1u8; 1024]);
+    let copy1 = Arc::clone(&data);
+    let t1 = thread::spawn(move || {
+        println!("{:?}", copy1);
+        return 1;
+    });
 
-    let read_buff = &result[..];
+    let copy2 = Arc::clone(&data);
+    let t2 = thread::spawn(move || {
+        let mut vec1 = copy2[..].to_vec();
+        vec1.push(Arc::new(User::of(1)));
+        vec1.push(Arc::new(User::of(2)));
+        return Arc::new(vec1);
+    });
 
-    let read_user: User<i32> = bincode::deserialize(read_buff).unwrap();
 
-    println!("{:?}", read_user);
+    t1.join().unwrap();
+    data = t2.join().unwrap();
+    println!("{:?}", data);
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct User<T> {
-    age: u32,
-    value: T,
-}
+#[derive(Debug, Default)]
+struct User(u32);
 
+impl User {
+    fn of(i: u32) -> Self { User { 0: i } }
+}
