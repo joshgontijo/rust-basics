@@ -9,5 +9,6 @@ members = [
  "smart-pointers",
  "error-handling",
  "flatten",
- "closure"
+ "closure",
+ "sdl2"
 ]
