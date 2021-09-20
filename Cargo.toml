@@ -1,14 +1,15 @@
 [workspace]
 members = [
- "threadpool",
- "modules",
- "channels",
- "lifetime",
- "scratch",
- "log",
- "smart-pointers",
- "error-handling",
- "flatten",
- "closure",
- "sdl2"
+    "threadpool",
+    "modules",
+    "channels",
+    "lifetime",
+    "scratch",
+    "log",
+    "smart-pointers",
+    "error-handling",
+    "flatten",
+    "closure",
+    "sdl-test",
+    "gat"
 ]
