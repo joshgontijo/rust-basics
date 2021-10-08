@@ -13,4 +13,7 @@ members = [
 #    "sdl-test",
     "gat",
     "object_pool"
+    "sdl-test",
+    "gat",
+    "anymap",
 ]
