@@ -1,117 +1,129 @@
-use std::borrow::{Borrow, BorrowMut, Cow};
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
-use std::fs::File;
-use std::mem::ManuallyDrop;
-use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex};
-use std::thread;
+#![feature(test)]
+#![feature(ptr_metadata)]
+extern crate anymap;
+extern crate test;
 
-use json::JsonValue::String;
-use json::object;
-use serde::{Deserialize, Serialize};
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
+use std::iter::Map;
+use std::mem;
+use std::ptr::DynMetadata;
+use std::slice::Iter;
+use test::bench::iter;
+
+use anymap::AnyMap;
+
+#[derive(Debug)]
+struct MyStruct {
+    v: i32,
+}
+
+impl MyStruct {
+    fn add(&mut self, val: i32) {
+        self.v += val;
+    }
+}
+
+impl Handler<String> for MyStruct {
+    fn on_event(&mut self, ev: &String) {
+        println!("{:?}", ev)
+    }
+}
+
+impl Handler<u32> for MyStruct {
+    fn on_event(&mut self, ev: &u32) {
+        println!("{:?}", ev)
+    }
+}
 
 fn main() {
-//     let instantiated = object! {
-//     "code" => 200,
-//     "success" => true,
-//     "payload" => object!{
-//         "features" => array![
-//             "awesome",
-//             "easyAPI",
-//             "lowLearningCurve"
-//         ]
-//     }
-// };
+    // let mut map = AnyMultiMap { map: Default::default() };
+    //
+    // let st = MyStruct { v: 0 };
+    // let st2 = MyStruct { v: 0 };
+    //
+    // map.put(st);
+    // map.put(st2);
+    //
+    // let a = map.get::<MyStruct>();
+    // a.for_each(|e| {
+    //     println!("{:?}", e)
+    // })
 
+    let st = MyStruct { v: 0 };
+    let mut bus = EventBus { table: Default::default() };
+    bus.register2(MyStruct::add);
+}
 
-    let pool = Pool::new(1, || Vec::<u32>::new());
+///////////////////////
 
-    println!("FIRST");
+pub struct AnyMultiMap {
+    map: HashMap<TypeId, Vec<Box<dyn Any>>>,
+}
+
+impl AnyMultiMap {
+    pub fn new() -> Self {
+        AnyMultiMap {
+            map: Default::default()
+        }
+    }
+
+    pub fn put<T: 'static>(&mut self, t: T) {
+        let id = TypeId::of::<T>();
+        self.map.entry(id).or_insert(Vec::new()).push(Box::new(t));
+    }
+
+    pub fn get<T: 'static>(&self) -> impl Iterator<Item=&'_ T> {
+        let id = TypeId::of::<T>();
+        let item = self.map.get(&id);
+
+        let iter_a = if let Some(v) = item {
+            Some(v.iter().map(|e| e.downcast_ref::<T>().unwrap()))
+        } else {
+            None
+        };
+
+        std::iter::empty().chain(iter_a.into_iter().flatten())
+    }
+}
+//////////////////////
+
+trait Handler<T> {
+    fn on_event(&mut self, ev: &T);
+}
+
+struct EventBus {
+    table: HashMap<TypeId, AnyMultiMap>,
+}
+
+impl EventBus {
+    fn register<H, T: 'static>(&mut self, id: &str, handler: H) where H: Handler<T> + 'static {
+        let ev_type = TypeId::of::<T>();
+        self.table.entry(ev_type)
+            .or_insert(AnyMultiMap::new())
+            .put(handler);
+    }
+
+    fn register2<F, T, E>(&mut self, f: F)
+        where F: FnMut(T, E) + 'static,
+              E: 'static
     {
-        let mut pooled = pool.pull().unwrap();
-        pooled.push(1);
+        let ev_type = TypeId::of::<E>();
+        self.table.entry(ev_type)
+            .or_insert(AnyMultiMap::new())
+            .put(f);
     }
 
-    println!("SECOND");
-
-    {
-        let mut pooled = pool.pull().unwrap();
-        pooled.push(1);
-    }
-}
-
-struct Pool<T> {
-    objects: Mutex<Vec<T>>,
-}
-
-impl<T> Pool<T> {
-    pub fn new<F>(capacity: usize, init: F) -> Self
-        where F: Fn() -> T
-    {
-        let mut items = Vec::new();
-
-        for _ in 0..capacity {
-            items.push(init());
-        }
-
-        Self {
-            objects: Mutex::new(items)
-        }
-    }
-
-    pub fn attach(&self, t: T) {
-        self.objects.lock()
-            .unwrap()
-            .push(t);
-    }
-
-    pub fn pull(&self) -> Option<Pooled<T>> {
-        println!("Pulling from pool");
-        self.objects.lock()
-            .ok()?
-            .pop()
-            .map(|data| Pooled::new(self, data))
+    fn send<T>(&self, ev: &T) {
+        // let ev_type = TypeId::of::<T>();
+        // if let Some(map) = self.table.get(&ev_type) {
+        //     let mut handlers = map.get::<T>();
+        //     let option: Option<&dyn Handler<T>> = handlers.next();
+        //     while let Some(handler) = handlers.next() {
+        //         handler(ev);
+        //     }
+        // }
     }
 }
-
-
-struct Pooled<'a, T> {
-    pool: &'a Pool<T>,
-    data: ManuallyDrop<T>,
-}
-
-
-impl<'a, T> Pooled<'a, T> {
-    pub fn new(pool: &'a Pool<T>, t: T) -> Self {
-        Self {
-            pool,
-            data: ManuallyDrop::new(t),
-        }
-    }
-}
-
-impl<'a, T> Deref for Pooled<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl<'a, T> DerefMut for Pooled<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
-}
-
-impl<'a, T> Drop for Pooled<'a, T> {
-    fn drop(&mut self) {
-        println!("Recycling...");
-        unsafe {
-            let t = ManuallyDrop::take(&mut self.data);
-            self.pool.attach(t)
-        }
-    }
-}
-
