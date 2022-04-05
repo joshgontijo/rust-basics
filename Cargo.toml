@@ -16,5 +16,6 @@ members = [
     "sdl-test",
     "gat",
     "anymap",
-    "condvar_sync"
+    "condvar_sync",
+    "borrowing_iterator",
 ]
