@@ -16,4 +16,5 @@ members = [
     "sdl-test",
     "gat",
     "anymap",
+    "condvar_sync"
 ]
