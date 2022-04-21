@@ -7,24 +7,8 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use json::JsonValue::String;
-use json::object;
-use serde::{Deserialize, Serialize};
 
 fn main() {
-//     let instantiated = object! {
-//     "code" => 200,
-//     "success" => true,
-//     "payload" => object!{
-//         "features" => array![
-//             "awesome",
-//             "easyAPI",
-//             "lowLearningCurve"
-//         ]
-//     }
-// };
-
-
     let pool = Pool::new(1, || Vec::<u32>::new());
 
     println!("FIRST");
@@ -34,7 +18,6 @@ fn main() {
     }
 
     println!("SECOND");
-
     {
         let mut pooled = pool.pull().unwrap();
         pooled.push(1);
