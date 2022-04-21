@@ -42,18 +42,30 @@ fn main() -> Result<(), String> {
     let texture_creator = canvas.texture_creator();
     let texture = texture_creator.load_texture("assets/reaper.png")?;
 
-    let position = Point::new(0, 0);
+    let speed = 2;
+    let mut position = Point::new(0, 0);
     // src position in the spritesheet
-    let sprite = Rect::new(0, 0, 26, 36);
+    let sprite = Rect::new(0, 0, 36, 36);
 
     let mut event_pump = sdl_context.event_pump()?;
     'running: loop {
         // Handle events
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit {..} |
-                Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                Event::Quit {..} | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running;
+                },
+                Event::KeyDown {keycode: Some(Keycode::W), ..} => {
+                    position = position.offset(0, -speed);
+                },
+                Event::KeyDown {keycode: Some(Keycode::A), ..} => {
+                    position = position.offset(-speed, 0);
+                },
+                Event::KeyDown {keycode: Some(Keycode::S), ..} => {
+                    position = position.offset(0, speed);
+                },
+                Event::KeyDown {keycode: Some(Keycode::D), ..} => {
+                    position = position.offset(speed, 0);
                 },
                 _ => {}
             }
@@ -65,7 +77,7 @@ fn main() -> Result<(), String> {
         render(&mut canvas, Color::BLACK, &texture, position, sprite)?;
 
         // Time management!
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 
     Ok(())
