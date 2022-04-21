@@ -10,9 +10,8 @@ members = [
     "error-handling",
     "flatten",
     "closure",
-#    "sdl-test",
     "gat",
-    "object_pool"
+    "object_pool",
     "sdl-test",
     "gat",
     "anymap",

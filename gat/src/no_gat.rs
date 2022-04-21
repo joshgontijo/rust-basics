@@ -18,7 +18,7 @@ fn main() {
     fn help_inference_out<F: FnMut(&[u8]) -> Wrapper<'_, [u8]>>(f: F) -> F {
         f
     }
-    let mut wrapped_item = iterator.map(help_inference_out(|e| Wrapper { e }));
+    let mut wrapped_item = iterator.map(|e| Wrapper { e });
     while let Some(item) = wrapped_item.next() {
         println!("{:?}", item);
     }
