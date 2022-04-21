@@ -1,11 +1,9 @@
-#![feature(generic_associated_types)]
-
 trait FnMut1Arg<A>: FnMut(A) -> <Self as FnMut1Arg<A>>::Output {
     type Output;
 }
-
 impl<F: ?Sized, A, O> FnMut1Arg<A> for F
-    where F: FnMut(A) -> O,
+    where
+        F: FnMut(A) -> O,
 {
     type Output = O;
 }
@@ -33,23 +31,26 @@ struct Wrapper<'a, T: ?Sized> {
 
 struct FileIt;
 
+impl<'n> HasItem<'n> for FileIt {
+    type Item = &'n [u8];
+}
 impl GatIterator for FileIt {
-    type Item<'n> where Self: 'n = &'n [u8];
-
-    fn next(&mut self) -> Option<Self::Item<'_>> {
+    fn next(&mut self) -> Option<Item<'_, Self>> {
         todo!()
     }
 }
 
-trait GatIterator {
-    type Item<'n> where Self: 'n;
-
-    fn next(&mut self) -> Option<Self::Item<'_>>;
+trait HasItem<'a, __ = &'a Self> {
+    type Item;
+}
+type Item<'a, This> = <This as HasItem<'a>>::Item;
+trait GatIterator: for<'n> HasItem<'n> {
+    fn next(&mut self) -> Option<Item<'_, Self>>;
 
     fn map<F>(self, f: F) -> Map<Self, F>
         where
             Self: Sized,
-            for<'n> F: FnMut1Arg<Self::Item<'n>>,
+            for<'n> F: FnMut1Arg<Item<'n, Self>>,
     {
         Map { it: self, f }
     }
@@ -61,17 +62,20 @@ pub struct Map<I, F> {
     f: F,
 }
 
-impl<'a, I, F> GatIterator for Map<I, F>
+impl<'n, I, F> HasItem<'n> for Map<I, F>
     where
         I: GatIterator,
-        for<'n> F: FnMut1Arg<I::Item<'n>>,
+        F: FnMut1Arg<Item<'n, I>>,
 {
-    type Item<'n>
-        where
-            Self: 'n,
-    = <F as FnMut1Arg<I::Item<'n>>>::Output;
+    type Item = <F as FnMut1Arg<Item<'n, I>>>::Output;
+}
 
-    fn next(&mut self) -> Option<Self::Item<'_>> {
+impl<I, F> GatIterator for Map<I, F>
+    where
+        I: GatIterator,
+        for<'n> F: FnMut1Arg<Item<'n, I>>,
+{
+    fn next(&mut self) -> Option<Item<'_, Self>> {
         self.it.next().map(&mut self.f)
     }
 }
