@@ -11,28 +11,6 @@ struct MyStruct2 {
     v: i32,
 }
 
-fn main() {
-    let mut map = AnyMultiMap { map: Default::default() };
-
-    let st = MyStruct1 { v: 0 };
-    let st2 = MyStruct2 { v: 0 };
-
-    map.put(st);
-    map.put(st2);
-
-    let a = map.get::<MyStruct1>();
-    a.for_each(|e| {
-        println!("{:?}", e)
-    });
-
-
-    let a = map.get::<MyStruct2>();
-    a.for_each(|e| {
-        println!("{:?}", e)
-    });
-}
-
-
 pub struct AnyMultiMap {
     map: HashMap<TypeId, Vec<Box<dyn Any>>>,
 }
@@ -60,5 +38,32 @@ impl AnyMultiMap {
         };
 
         std::iter::empty().chain(iter_a.into_iter().flatten())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let mut map = AnyMultiMap { map: Default::default() };
+
+        let st = MyStruct1 { v: 0 };
+        let st2 = MyStruct2 { v: 0 };
+
+        map.put(st);
+        map.put(st2);
+
+        let a = map.get::<MyStruct1>();
+        a.for_each(|e| {
+            println!("{:?}", e)
+        });
+
+
+        let a = map.get::<MyStruct2>();
+        a.for_each(|e| {
+            println!("{:?}", e)
+        });
     }
 }
