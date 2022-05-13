@@ -17,4 +17,7 @@ members = [
     "anymap",
     "condvar_sync",
     "borrowing_iterator",
+    "actix-test",
+    "extension-methods",
+    "ecs",
 ]
