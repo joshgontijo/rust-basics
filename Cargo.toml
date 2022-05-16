@@ -20,4 +20,5 @@ members = [
     "actix-test",
     "extension-methods",
     "ecs",
+    "declarative-macros",
 ]
