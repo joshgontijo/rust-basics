@@ -15,6 +15,11 @@ impl<'a> EntityBuilder<'a> {
         self
     }
 
+    pub fn with_system<F, T>(&'a mut self, f: F) -> &'a mut Self where F: Fn(T) -> () {
+
+        self
+    }
+
     pub fn id(&mut self) -> EntityId {
         self.id
     }

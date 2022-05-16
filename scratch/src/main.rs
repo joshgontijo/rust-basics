@@ -1,32 +1,60 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+#![feature(type_alias_impl_trait)]
 
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
+use std::alloc::Layout;
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::slice::{Iter, IterMut};
+
+
+
+macro_rules! add {
+ // macth like arm for macro
+    ($a:expr,$b:expr)=>{
+ // macro expand to this code
+        {
+            // $a and $b will be templated using the value/variable provided to macro
+            $a+$b
+        }
+    }
 }
 
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
-}
+fn main() {
 
-async fn manual_hello() -> impl Responder {
-    HttpResponse::Ok().body("Hey there!")
-}
+    let value = (1,2);
 
-#[actix_web::main] // or #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    let port = 8080;
-    let server = HttpServer::new(|| {
-        App::new()
-            .route("/hey", web::get().to(manual_hello))
-            .service(hello)
-            .service(echo)
-    })
-        .bind(("127.0.0.1", port))?
-        .run();
 
-    println!("Server started on {port}");
-    server.await
 
 }
+
+
+fn register_system<T>(system: impl System<Data=T>) {
+    
+}
+
+
+
+
+struct MovementSystem;
+impl System for MovementSystem {
+    type Data = (Speed, Health);
+
+    fn run(&self, data: Self::Data) {
+        
+    }
+}
+
+trait System {
+    type Data;
+    fn run(&self, data: Self::Data);
+}
+
+struct World {
+    map: HashMap<TypeId, Vec<u32>>,
+}
+
+#[derive(Debug)]
+struct Speed(u32);
+
+#[derive(Debug)]
+struct Health(u32);
