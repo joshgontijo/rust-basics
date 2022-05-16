@@ -33,10 +33,13 @@ fn main() -> Result<(), String> {
 
     let window = video_subsystem.window("game tutorial", 800, 600)
         .position_centered()
+        .resizable()
         .build()
         .expect("could not initialize video subsystem");
 
-    let mut canvas = window.into_canvas().build()
+    let mut canvas = window.into_canvas()
+        .accelerated()
+        .build()
         .expect("could not make a canvas");
 
     let texture_creator = canvas.texture_creator();
