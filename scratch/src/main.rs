@@ -149,7 +149,7 @@ impl World {
             .map(|e| {
                 match e {
                     None => None,
-                    Some(t) => Some(t.downcast_ref::<T>().unwrap())
+                    Some(t) => t.downcast_ref::<T>()
                 }
             }).flatten()
     }
