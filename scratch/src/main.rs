@@ -1,9 +1,7 @@
-use std::alloc::Layout;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::slice::{Iter, IterMut};
 
 // impl<T> Print for (T) {
 //     fn print() {
@@ -86,7 +84,7 @@ fn main() {
 
     println!("--------");
 
-    let mut it = world.iter::<(Health,)>();
+    let mut it = world.iter::<(Health, )>();
     while let Some((health)) = it.next() {
         println!("{health:?}");
     }
@@ -133,13 +131,24 @@ impl<'a, Tuple: Fetch<'a>> Iterator for WorldIter<'a, Tuple> {
 }
 
 impl World {
-
     fn iter<Tuple>(&self) -> WorldIter<Tuple> {
         WorldIter {
             entity_idx: 0,
             world: &self,
             _m: PhantomData,
         }
+    }
+
+    fn get_mut<T: Any>(&mut self, idx: usize) -> Option<&mut T> {
+        self.map.get_mut(&TypeId::of::<T>())
+            .unwrap()
+            .get_mut(idx)
+            .map(|e| {
+                match e {
+                    None => None,
+                    Some(t) => t.downcast_mut::<T>()
+                }
+            }).flatten()
     }
 
     fn get<T: Any>(&self, idx: usize) -> Option<&T> {
