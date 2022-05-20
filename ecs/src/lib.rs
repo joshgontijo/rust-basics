@@ -3,9 +3,12 @@
 extern crate core;
 
 use std::any::{Any, TypeId};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
-use std::iter;
-use std::path::Iter;
+use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::rc::Rc;
 
 use crate::entity_builder::{EntityBuilder, EntityId};
 
@@ -20,14 +23,14 @@ struct Health(u32);
 #[derive(Debug, Default)]
 pub struct World {
     entity_count: usize,
-    components: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
+    components: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>,
     resources: HashMap<TypeId, Box<dyn Any>>,
 }
 
 
 #[derive(Default)]
 pub struct WorldBuilder {
-    components: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
+    components: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>,
 }
 
 impl WorldBuilder {
@@ -91,57 +94,128 @@ impl World {
         };
     }
 
-    fn get_components<T: Any>(&self) -> impl Iterator<Item=&'_ T> {
-        let components = self.components.get(&TypeId::of::<T>()).expect("Component not registered");
-        components.iter().filter_map(|e| {
-            match e {
-                None => None,
-                Some(c) => Some(c.downcast_ref::<T>().unwrap())
-            }
-        })
-    }
-
-    pub fn get_entity_component<T: Any>(&self, entity_id: EntityId) -> Option<&T> {
-        let id = TypeId::of::<T>();
-        let components = self.components.get(&id).expect("Component not registered");
-
-        components.get(entity_id).map(|e| {
-            match e {
-                None => None,
-                Some(c) => Some(c.downcast_ref::<T>().unwrap())
-            }
-        }).flatten()
-    }
-
-    pub fn iter<T: Any>(&self) -> impl Iterator<Item=&'_ T> {
-        let id = TypeId::of::<T>();
-        let item = self.components.get(&id).expect("Component no registered");
-
-        item.iter().filter_map(|e| {
-            match e {
-                None => None,
-                Some(v) => {
-                    v.downcast_ref::<T>()
+    fn get_component<T: Any>(&self, entity_id: EntityId) -> Option<Component<T>> {
+        self.components.get(&TypeId::of::<T>())
+            .expect("Component not registered")
+            .get(entity_id)
+            .map(|e| {
+                match e {
+                    None => None,
+                    Some(t) => Some(Component::new(Rc::clone(t)))
                 }
-            }
-        })
+            }).flatten()
+    }
+
+    fn query<Tuple>(&self) -> ComponentsIter<Tuple> {
+        ComponentsIter {
+            entity_idx: 0,
+            world: self,
+            _m: PhantomData,
+        }
     }
 }
 
-trait System {
+struct Component<T: Any> {
+    inner: Rc<RefCell<dyn Any>>,
+    _m: PhantomData<T>,
+}
+
+impl<T: Any + Debug> Debug for Component<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.as_ref().fmt(f)
+    }
+}
+
+impl<T: Any> Component<T> {
+    fn new(rc: Rc<RefCell<dyn Any>>) -> Self {
+        Self {
+            inner: rc,
+            _m: PhantomData,
+        }
+    }
+
+    // fn as_ref(& self) -> impl Deref<Target = T> + '_ {
+    //     Ref::map(self.inner.borrow(), |any| any.downcast_ref::<T>().unwrap())
+    // }
+
+    fn as_ref(&self) -> Ref<'_, T> {
+        Ref::map(self.inner.borrow(), |any| any.downcast_ref::<T>().unwrap())
+    }
+
+    fn as_ref_mut(&self) -> RefMut<'_, T> {
+        RefMut::map(self.inner.borrow_mut(), |any| any.downcast_mut::<T>().unwrap())
+    }
+}
+
+struct ComponentsIter<'a, Tuple> {
+    entity_idx: usize,
+    world: &'a World,
+    _m: PhantomData<Tuple>,
+}
+
+impl<'a, Tuple: Fetch> Iterator for ComponentsIter<'a, Tuple> {
+    type Item = Tuple::Data;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let world = &mut self.world;
+        let res = Tuple::fetch(world, self.entity_idx);
+        self.entity_idx += 1;
+        res
+    }
+}
+
+trait Fetch {
     type Data;
-    fn run(&self, data: Self::Data);
+    fn fetch(world: &World, idx: usize) -> Option<Self::Data>;
 }
 
-struct TestSystem;
+/// Resolves to:
+/// impl<T1, T2> Fetch for (T1, T2)
+///    where
+///       T1: Any,
+///       T2: Any
+///  {
+///      type Data = (Component<T1>, Component<T2>);
+///
+///      fn fetch(world: &World, idx: usize) -> Option<Self::Data> {
+///          Some((world.get_component::<T1>(idx)?, world.get_component::<T2>(idx)?))
+///      }
+///  }
+macro_rules! fetch_tuple {
 
-impl System for TestSystem {
-    type Data = (Speed, Health);
+     ($($ty: ident),*) => {// match like arm for macro
+          impl<$($ty,)*> Fetch for ($($ty,)*)
+            where
+                $(
+                    $ty: Any,
+                )*
 
-    fn run(&self, data: Self::Data) {}
+         {
+            type Data = ($(Component<$ty>,)*);
+
+            fn fetch(world: &World, idx: usize) -> Option<Self::Data> {
+                // let t1 = world.get::<T1>(idx);
+                // let t2 = world.get::<T2>(idx);
+                // let res = ( world.get::<T1>(idx)?, world.get::<T2>(idx)?);
+                // return Some(res);
+
+                Some(($(world.get_component::<$ty>(idx)?,)*))
+                }
+         }
+    }
 }
 
-fn test_system() {}
+
+fetch_tuple! {T0}
+fetch_tuple! {T0, T1}
+fetch_tuple! {T0, T1, T2}
+fetch_tuple! {T0, T1, T2, T3}
+fetch_tuple! {T0, T1, T2, T3, T4}
+fetch_tuple! {T0, T1, T2, T3, T4, T5}
+fetch_tuple! {T0, T1, T2, T3, T4, T5, T6}
+fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7}
+fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8}
+fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8, T9}
 
 
 #[cfg(test)]
@@ -163,13 +237,13 @@ mod tests {
             .with_component(Health(100));
 
 
-        let a = world.iter::<Speed>();
-        a.for_each(|e| {
+        let a = world.query::<(Speed, Health)>();
+        a.for_each(|(e)| {
             println!("{:?}", e)
         });
 
 
-        let a = world.iter::<Health>();
+        let a = world.query::<(Health, )>();
         a.for_each(|e| {
             println!("{:?}", e)
         });
@@ -201,40 +275,10 @@ mod tests {
             .with_component(Health(100))
             .with_component(Speed(1));
 
-        world.new_entity()
-            .with_component(Speed(2));
 
-
-        let mut iter = world.get_components::<Speed>();
-
-        assert_eq!(Some(&Speed(1)), iter.next());
-        assert_eq!(Some(&Speed(2)), iter.next());
-        assert_eq!(None, iter.next());
-    }
-
-    #[test]
-    fn system() {
-        fn test_system(query: (Health, Speed)) {
-            let (health, speed) = query;
-            println!("{health:?} {speed:?}");
-        }
-
-        let mut world = World::builder()
-            .register_component::<Health>()
-            .register_component::<Speed>()
-            .build();
-
-        world.new_entity()
-            .with_component(Health(100))
-            .with_component(Speed(1))
-            .with_system(test_system);
-
-
-        let mut iter = world.get_components::<Speed>();
-
-        assert_eq!(Some(&Speed(1)), iter.next());
-        assert_eq!(Some(&Speed(2)), iter.next());
-        assert_eq!(None, iter.next());
+        let component = world.get_component::<Speed>(0);
+        assert!(component.is_some());
+        assert_eq!(component.unwrap().as_ref().0, 1);
     }
 
     #[test]
