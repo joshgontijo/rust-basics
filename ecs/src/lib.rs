@@ -73,6 +73,13 @@ impl World {
         })
     }
 
+    pub fn remove_resource<T: Any>(&mut self) -> Option<T> {
+        self.resources.remove(&TypeId::of::<T>())
+            .map(|v| {
+                *v.downcast::<T>().unwrap()
+            })
+    }
+
     pub fn new_entity(&mut self) -> EntityBuilder {
         self.components.values_mut().for_each(|components| components.push(None));
 
@@ -243,5 +250,10 @@ mod tests {
         world.get_resource_mut::<WorldWidth>().unwrap().0 += 1;
         let v = world.get_resource::<WorldWidth>().unwrap().0;
         assert_eq!(v, 124);
+
+
+        world.get_resource_mut::<WorldWidth>().unwrap().0 += 1;
+        let v = world.remove_resource::<WorldWidth>();
+        assert!(v.is_some())
     }
 }
