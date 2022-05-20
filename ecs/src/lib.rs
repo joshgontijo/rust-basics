@@ -21,37 +21,56 @@ struct Health(u32);
 pub struct World {
     entity_count: usize,
     components: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
+    resources: HashMap<TypeId, Box<dyn Any>>,
 }
 
+
+#[derive(Default)]
 pub struct WorldBuilder {
-    map: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
+    components: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
 }
 
 impl WorldBuilder {
     pub fn register_component<T: Any>(mut self) -> Self {
         let id = TypeId::of::<T>();
-        if self.map.contains_key(&id) {
+        if self.components.contains_key(&id) {
             panic!("Component already registered");
         }
-        self.map.insert(id, vec![]);
+        self.components.insert(id, vec![]);
         WorldBuilder {
-            map: self.map
+            components: self.components
         }
     }
 
     pub fn build(self) -> World {
         World {
             entity_count: 0,
-            components: self.map,
+            components: self.components,
+            resources: Default::default(),
         }
     }
 }
 
 impl World {
     pub fn builder() -> WorldBuilder {
-        WorldBuilder {
-            map: Default::default()
-        }
+        Default::default()
+    }
+
+    pub fn add_resource<T: Any>(&mut self, resource: T) -> &mut Self {
+        self.resources.insert(TypeId::of::<T>(), Box::new(resource));
+        self
+    }
+
+    pub fn get_resource<T: Any>(&self) -> Option<&T> {
+        self.resources.get(&TypeId::of::<T>()).map(|v| {
+            v.downcast_ref::<T>().unwrap()
+        })
+    }
+
+    pub fn get_resource_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.resources.get_mut(&TypeId::of::<T>()).map(|v| {
+            v.downcast_mut::<T>().unwrap()
+        })
     }
 
     pub fn new_entity(&mut self) -> EntityBuilder {
@@ -108,18 +127,14 @@ trait System {
 }
 
 struct TestSystem;
+
 impl System for TestSystem {
     type Data = (Speed, Health);
 
-    fn run(&self, data: Self::Data) {
-
-    }
+    fn run(&self, data: Self::Data) {}
 }
 
-fn test_system() {
-
-}
-
+fn test_system() {}
 
 
 #[cfg(test)]
@@ -166,7 +181,6 @@ mod tests {
 
         world.new_entity()
             .with_component(Speed(1));
-
     }
 
     #[test]
@@ -189,12 +203,10 @@ mod tests {
         assert_eq!(Some(&Speed(1)), iter.next());
         assert_eq!(Some(&Speed(2)), iter.next());
         assert_eq!(None, iter.next());
-
     }
 
     #[test]
     fn system() {
-
         fn test_system(query: (Health, Speed)) {
             let (health, speed) = query;
             println!("{health:?} {speed:?}");
@@ -216,9 +228,20 @@ mod tests {
         assert_eq!(Some(&Speed(1)), iter.next());
         assert_eq!(Some(&Speed(2)), iter.next());
         assert_eq!(None, iter.next());
-
     }
 
+    #[test]
+    fn test_resource() {
+        struct WorldWidth(u32);
 
+        let mut world = World::builder().build();
+        world.add_resource(WorldWidth(123));
 
+        let v = world.get_resource::<WorldWidth>().unwrap().0;
+        assert_eq!(v, 123);
+
+        world.get_resource_mut::<WorldWidth>().unwrap().0 += 1;
+        let v = world.get_resource::<WorldWidth>().unwrap().0;
+        assert_eq!(v, 124);
+    }
 }
