@@ -298,6 +298,9 @@ mod tests {
 
         world.get_resource_mut::<WorldWidth>().unwrap().0 += 1;
         let v = world.remove_resource::<WorldWidth>();
-        assert!(v.is_some())
+        assert!(v.is_some());
+
+        let found = world.get_resource::<WorldWidth>();
+        assert!(found.is_none());
     }
 }
