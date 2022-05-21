@@ -14,9 +14,6 @@ impl<T> System<T> where T: Fetch {
             _m: PhantomData,
         }
     }
-
-
-
 }
 
 #[derive(Default)]
