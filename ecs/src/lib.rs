@@ -1,4 +1,5 @@
 #![feature(type_alias_impl_trait)]
+#![feature(associated_type_defaults)]
 
 extern crate core;
 
@@ -8,23 +9,48 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::os::windows::process::CommandExt;
 use std::rc::Rc;
 
 use crate::entity_builder::{EntityBuilder, EntityId};
 
 mod entity_builder;
+mod system;
 
-#[derive(Debug, Default, Eq, PartialEq)]
-struct Speed(u32);
 
-#[derive(Debug, Default, Eq, PartialEq)]
-struct Health(u32);
-
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct World {
     entity_count: usize,
-    components: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>,
     resources: HashMap<TypeId, Box<dyn Any>>,
+    components: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>,
+    systems: Vec<Box<dyn SystemRunner + 'static>>,
+}
+
+struct System<T> where T: Fetch {
+    f: fn(T::Data),
+    _m: PhantomData<T>,
+}
+
+trait SystemRunner {
+    fn run(&mut self, world: &World);
+}
+
+impl<T> System<T> where T: Fetch {
+    fn new(f: fn(T::Data)) -> Self {
+        Self {
+            f,
+            _m: PhantomData,
+        }
+    }
+}
+
+impl<T: Fetch> SystemRunner for System<T> {
+    fn run(&mut self, world: &World) {
+        let mut iter = world.query::<T>();
+        while let Some(item) = iter.next() {
+            (self.f)(item);
+        }
+    }
 }
 
 
@@ -50,6 +76,7 @@ impl WorldBuilder {
             entity_count: 0,
             components: self.components,
             resources: Default::default(),
+            systems: Default::default(),
         }
     }
 }
@@ -113,9 +140,31 @@ impl World {
             _m: PhantomData,
         }
     }
+
+    // fn run_system<T: System>(&self, ) {
+    //     let mut iter = self.query::<T::Tuple>();
+    //     while let Some(item) = iter.next() {
+    //         T::run(item);
+    //     }
+    // }
+
+
+    fn with_system<T>(&mut self, f: fn(T::Data))
+        where
+            T: Fetch + 'static
+    {
+        self.systems.push(Box::new(System::<T>::new(f)));
+    }
+
+    fn run_systems(&mut self) {
+        let systems = &mut self.systems;
+        for system in systems.iter_mut() {
+            system.run(self);
+        }
+    }
 }
 
-struct Component<T: Any> {
+pub struct Component<T: Any> {
     inner: Rc<RefCell<dyn Any>>,
     _m: PhantomData<T>,
 }
@@ -134,6 +183,9 @@ impl<T: Any> Component<T> {
         }
     }
 
+    fn inner_type(&self) -> TypeId {
+        TypeId::of::<T>()
+    }
     // fn as_ref(& self) -> impl Deref<Target = T> + '_ {
     //     Ref::map(self.inner.borrow(), |any| any.downcast_ref::<T>().unwrap())
     // }
@@ -164,7 +216,7 @@ impl<'a, Tuple: Fetch> Iterator for ComponentsIter<'a, Tuple> {
     }
 }
 
-trait Fetch {
+pub trait Fetch {
     type Data;
     fn fetch(world: &World, idx: usize) -> Option<Self::Data>;
 }
@@ -222,6 +274,13 @@ fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8, T9}
 mod tests {
     use super::*;
 
+    #[derive(Debug, Default, Eq, PartialEq)]
+    struct Speed(u32);
+
+    #[derive(Debug, Default, Eq, PartialEq)]
+    struct Health(u32);
+
+
     #[test]
     fn iter() {
         let mut world = World::builder()
@@ -262,6 +321,13 @@ mod tests {
 
         world.new_entity()
             .with_component(Speed(1));
+
+
+        let mut query = world.query::<(Speed, Health)>();
+
+        while let Some((speed, health)) = query.next() {
+            speed.as_ref_mut().0 += 1
+        }
     }
 
     #[test]
@@ -302,5 +368,35 @@ mod tests {
 
         let found = world.get_resource::<WorldWidth>();
         assert!(found.is_none());
+    }
+
+
+    // struct MovementSystem;
+    //
+    // impl System for MovementSystem {
+    //     type Tuple = (Speed, Health);
+    //
+    //     fn run(&mut self, (speed, health): Self::Item) {
+    //         println!("{speed:?} {health:?}");
+    //     }
+    // }
+
+    fn run((speed, health): (Component<Speed>, Component<Health>)) {
+        println!("{speed:?} {health:?}");
+    }
+
+    #[test]
+    fn test_run_system() {
+        let mut world = World::builder()
+            .register_component::<Health>()
+            .register_component::<Speed>()
+            .build();
+
+        world.new_entity()
+            .with_component(Health(100))
+            .with_component(Speed(1));
+
+
+        world.with_system::<(Speed, Health)>(run);
     }
 }
