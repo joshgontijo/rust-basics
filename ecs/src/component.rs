@@ -1,15 +1,18 @@
 use std::any::{Any, TypeId};
 use std::cell::{Ref, RefCell, RefMut};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
+use std::process::id;
 use std::rc::Rc;
 
 use crate::{EntityId, World};
 
 #[derive(Default)]
 pub struct Components {
+    entities: usize,
     items: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>,
+    vacant: VecDeque<usize>,
 }
 
 pub struct Component<T: Any> {
@@ -20,11 +23,45 @@ pub struct Component<T: Any> {
 
 impl Components {
     pub(crate) fn new(items: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>) -> Self {
-        Self { items }
+        Self { entities: 0, items, vacant: VecDeque::default() }
     }
 
-    pub fn new_entity(&mut self) {
-        self.items.values_mut().for_each(|components| components.push(None));
+    pub fn new_entity(&mut self) -> EntityId {
+        match self.vacant.pop_front() {
+            None => { //alocate new one
+                let idx = self.items.len();
+                self.items.values_mut().for_each(|components| components.push(None));
+                self.entities += 1;
+                idx
+            }
+            Some(vacant) => vacant
+        }
+    }
+
+    pub fn remove_entity(&mut self, id: EntityId) {
+        if id >= self.entities {
+            panic!("Entity id out of bounds")
+        }
+        for (_, components) in self.items.iter_mut() {
+            components.insert(id, None)
+        }
+        self.vacant.push_back(id);
+        self.entities -= 1;
+    }
+
+    pub fn remove_component<T: Any>(&mut self, id: EntityId) {
+        if id >= self.entities {
+            panic!("Entity id out of bounds")
+        }
+        let type_id = TypeId::of::<T>();
+        self.items.get_mut(&type_id)
+            .expect("Component not registered")
+            .insert(id, None);
+    }
+
+    pub fn add_component<T: Any>(&mut self, entity_id: EntityId, component: T) {
+        let component_vec = self.items.get_mut(&TypeId::of::<T>()).expect("Component type not registered");
+        component_vec.insert(entity_id, Some(Rc::new(RefCell::new(component))));
     }
 
     pub fn get_component<T: Any>(&self, entity_id: EntityId) -> Option<Component<T>> {
@@ -37,11 +74,6 @@ impl Components {
                     Some(t) => Some(Component::new(Rc::clone(t)))
                 }
             }).flatten()
-    }
-
-    pub fn add_component<T: Any>(&mut self, entity_id: EntityId, component: T) {
-        let component_vec = self.items.get_mut(&TypeId::of::<T>()).expect("Component type not registered");
-        component_vec.insert(entity_id, Some(Rc::new(RefCell::new(component))));
     }
 
     pub(crate) fn query<Tuple>(&self) -> ComponentsIter<Tuple> {

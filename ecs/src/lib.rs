@@ -21,7 +21,6 @@ mod resource;
 
 #[derive(Default)]
 pub struct World {
-    entity_count: usize,
     resources: Resources,
     components: Components,
     systems: Systems,
@@ -47,7 +46,6 @@ impl WorldBuilder {
 
     pub fn build(self) -> World {
         World {
-            entity_count: 0,
             components: Components::new(self.components),
             resources: Resources::default(),
             systems: Systems::default(),
@@ -78,16 +76,14 @@ impl World {
     }
 
     pub fn new_entity(&mut self) -> EntityBuilder {
-        self.components.new_entity();
-
-        let entity_id = self.entity_count;
-        self.entity_count += 1;
+        let entity_id = self.components.new_entity();
         return EntityBuilder {
             id: entity_id,
             components: &mut self.components,
         };
     }
 
+    
     pub fn get_component<T: Any>(&self, entity_id: EntityId) -> Option<Component<T>> {
         self.components.get_component(entity_id)
     }
