@@ -4,9 +4,8 @@
 extern crate core;
 
 use std::any::{Any, TypeId};
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::marker::PhantomData;
 use std::rc::Rc;
 
 use crate::component::{Component, Components, ComponentsIter, Fetch};
@@ -235,6 +234,5 @@ mod tests {
 
         world.with_system::<(Speed, Health)>(run);
         world.run_systems();
-
     }
 }
