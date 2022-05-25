@@ -2,22 +2,20 @@ use std::marker::PhantomData;
 use std::slice::{Iter, IterMut};
 use crate::{Components, Fetch};
 
-struct System<F, C, T>
+struct System<C, T>
     where
         T: Fetch,
-        F: Fn(&mut C, T::Data)
 {
-    f: F,
+    f: fn(&mut C, T::Data),
     _m1: PhantomData<T>,
     _m2: PhantomData<C>,
 }
 
-impl<F, C, T> System<F, C, T>
+impl<C, T> System<C, T>
     where
         T: Fetch,
-        F: Fn(&mut C, T::Data)
 {
-    fn new(f: F) -> Self {
+    fn new(f: fn(&mut C, T::Data)) -> Self {
         Self {
             f,
             _m1: PhantomData::<T>::default(),
@@ -28,7 +26,7 @@ impl<F, C, T> System<F, C, T>
 
 #[derive(Default)]
 pub struct Systems<C> {
-    items: Vec<Box<dyn SystemRunner<C> + 'static>>,
+    items: Vec<Box<dyn SystemRunner<C>>>,
 }
 
 impl<C: 'static> Systems<C> {
@@ -36,12 +34,11 @@ impl<C: 'static> Systems<C> {
         Self { items: vec![] }
     }
 
-    pub fn add_system<F: 'static, T>(&mut self, f: F)
+    pub fn add_system<T>(&mut self, f: fn(&mut C, T::Data))
         where
             T: Fetch + 'static,
-            F: Fn(&mut C, T::Data)
     {
-        let system = System::<F, C, T>::new(f);
+        let system = System::<C, T>::new(f);
         self.items.push(Box::new(system));
     }
 
@@ -55,10 +52,9 @@ pub trait SystemRunner<C> {
 }
 
 
-impl<F, C, T> SystemRunner<C> for System<F, C, T>
+impl<C, T> SystemRunner<C> for System<C, T>
     where
         T: Fetch,
-        F: Fn(&mut C, T::Data)
 {
     fn run(&mut self, ctx: &mut C, components: &Components) {
         let mut iter = components.query::<T>();
