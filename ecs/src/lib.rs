@@ -91,16 +91,15 @@ impl<C: 'static> World<C> {
         self.components.query::<Tuple>()
     }
 
-    fn with_system<F: 'static, T>(&mut self, f: F) -> &mut Self
+    pub fn with_system<T>(&mut self, f: fn(&mut C, T::Data)) -> &mut Self
         where
             T: Fetch + 'static,
-            F: Fn(&mut C, T::Data)
     {
-        self.systems.add_system::<F, T>(f);
+        self.systems.add_system::<T>(f);
         self
     }
 
-    fn run_systems(&mut self, ctx: &mut C) {
+    pub fn run_systems(&mut self, ctx: &mut C) {
         let components = &self.components;
         for system in self.systems.iter_mut() {
             system.run(ctx, components)
@@ -231,7 +230,7 @@ mod tests {
             .with_component(Speed(1));
 
         let mut ctx = Ctx(1);
-        world.with_system::<_,(Speed, Health)>(run);
+        world.with_system::<(Speed, Health)>(run);
         world.run_systems(&mut ctx);
     }
 }
