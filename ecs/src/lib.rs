@@ -20,12 +20,15 @@ mod resource;
 
 
 #[derive(Default)]
-pub struct World {
+pub struct World<C> {
     resources: Resources,
     components: Components,
-    systems: Systems,
+    systems: Systems<C>,
 }
 
+pub fn builder() -> WorldBuilder {
+    Default::default()
+}
 
 #[derive(Default)]
 pub struct WorldBuilder {
@@ -44,20 +47,16 @@ impl WorldBuilder {
         }
     }
 
-    pub fn build(self) -> World {
+    pub fn build<C: 'static>(self) -> World<C> {
         World {
             components: Components::new(self.components),
             resources: Resources::default(),
-            systems: Systems::default(),
+            systems: Systems::new(),
         }
     }
 }
 
-impl World {
-    pub fn builder() -> WorldBuilder {
-        Default::default()
-    }
-
+impl<C: 'static> World<C> {
     pub fn add_resource<T: Any>(&mut self, resource: T) -> &mut Self {
         self.resources.add_resource(resource);
         self
@@ -83,7 +82,7 @@ impl World {
         };
     }
 
-    
+
     pub fn get_component<T: Any>(&self, entity_id: EntityId) -> Option<Component<T>> {
         self.components.get_component(entity_id)
     }
@@ -92,18 +91,19 @@ impl World {
         self.components.query::<Tuple>()
     }
 
-    fn with_system<T>(&mut self, f: fn(T::Data)) -> &mut Self
+    fn with_system<F: 'static, T>(&mut self, f: F) -> &mut Self
         where
-            T: Fetch + 'static
+            T: Fetch + 'static,
+            F: Fn(&mut C, T::Data)
     {
-        self.systems.add_system::<T>(f);
+        self.systems.add_system::<F, T>(f);
         self
     }
 
-    fn run_systems(&mut self) {
+    fn run_systems(&mut self, ctx: &mut C) {
         let components = &self.components;
         for system in self.systems.iter_mut() {
-            system.run(components)
+            system.run(ctx, components)
         }
     }
 }
@@ -124,10 +124,10 @@ mod tests {
 
     #[test]
     fn iter() {
-        let mut world = World::builder()
+        let mut world = builder()
             .register_component::<Health>()
             .register_component::<Speed>()
-            .build();
+            .build::<()>();
 
         world.new_entity()
             .with_component(Health(100))
@@ -151,10 +151,10 @@ mod tests {
 
     #[test]
     fn query() {
-        let mut world = World::builder()
+        let mut world = builder()
             .register_component::<Health>()
             .register_component::<Speed>()
-            .build();
+            .build::<()>();
 
         world.new_entity()
             .with_component(Health(100))
@@ -173,10 +173,10 @@ mod tests {
 
     #[test]
     fn get_components() {
-        let mut world = World::builder()
+        let mut world = builder()
             .register_component::<Health>()
             .register_component::<Speed>()
-            .build();
+            .build::<()>();
 
         world.new_entity()
             .with_component(Health(100))
@@ -192,7 +192,7 @@ mod tests {
     fn test_resource() {
         struct WorldWidth(u32);
 
-        let mut world = World::builder().build();
+        let mut world = builder().build::<()>();
         world.add_resource(WorldWidth(123));
 
         let v = world.get_resource::<WorldWidth>().unwrap().0;
@@ -212,23 +212,26 @@ mod tests {
     }
 
 
-    fn run((speed, health): (Component<Speed>, Component<Health>)) {
-        println!("{speed:?} {health:?}");
+    fn run(ctx: &mut Ctx, (speed, health): (Component<Speed>, Component<Health>)) {
+        println!("{ctx:?} {speed:?} {health:?}");
     }
+
+    #[derive(Debug)]
+    struct Ctx(u32);
 
     #[test]
     fn test_run_system() {
-        let mut world = World::builder()
+        let mut world = builder()
             .register_component::<Health>()
             .register_component::<Speed>()
-            .build();
+            .build::<Ctx>();
 
         world.new_entity()
             .with_component(Health(100))
             .with_component(Speed(1));
 
-
-        world.with_system::<(Speed, Health)>(run);
-        world.run_systems();
+        let mut ctx = Ctx(1);
+        world.with_system::<_,(Speed, Health)>(run);
+        world.run_systems(&mut ctx);
     }
 }

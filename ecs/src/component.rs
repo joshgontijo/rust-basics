@@ -29,7 +29,7 @@ impl Components {
     pub fn new_entity(&mut self) -> EntityId {
         match self.vacant.pop_front() {
             None => { //alocate new one
-                let idx = self.items.len();
+                let idx = self.entities;
                 self.items.values_mut().for_each(|components| components.push(None));
                 self.entities += 1;
                 idx
