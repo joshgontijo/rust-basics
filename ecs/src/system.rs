@@ -1,14 +1,14 @@
 use std::marker::PhantomData;
 use std::slice::{Iter, IterMut};
-use crate::{Components, Fetch};
+use crate::{Components, Fetch, World};
 
-struct System<T> where T: Fetch {
-    f: fn(T::Data),
-    _m: PhantomData<T>,
+struct System<C, T> where T: Fetch {
+    f: Box<dyn Sys<Query = T, Ctx = C>>,
+    _m: PhantomData<fn() -> T>,
 }
 
-impl<T> System<T> where T: Fetch {
-    fn new(f: fn(T::Data)) -> Self {
+impl<C, T> System<C, T> where T: Fetch {
+    fn new(f: Box<dyn Sys<Query = T, Ctx = C>>) -> Self {
         Self {
             f,
             _m: PhantomData,
@@ -17,36 +17,46 @@ impl<T> System<T> where T: Fetch {
 }
 
 #[derive(Default)]
-pub struct Systems {
-    items: Vec<Box<dyn SystemRunner + 'static>>,
+pub struct Systems<C> {
+    pub(crate) items: Vec<Box<dyn SystemRunner<C>>>,
 }
 
-impl Systems {
-    pub fn add_system<T>(&mut self, f: fn(T::Data))
+impl<C: 'static> Systems<C> {
+    pub fn add_system<T>(&mut self, f: Box<dyn Sys<Query = T, Ctx = C>>)
         where
             T: Fetch + 'static
     {
-        self.items.push(Box::new(System::<T>::new(f)));
+        let system = System::<C, T>::new(f);
+        self.items.push(Box::new(system));
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<'_, Box<dyn SystemRunner>> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, Box<dyn SystemRunner<C>>> {
         self.items.iter_mut()
     }
 
 }
 
-pub trait SystemRunner {
-    fn run(&mut self, components: &Components);
+pub trait SystemRunner<C> {
+    fn run(&mut self, ctx: &mut C, components: &Components);
 }
 
 
 
-impl<T: Fetch> SystemRunner for System<T> {
-    fn run(&mut self, components: &Components) {
+impl<C, T: Fetch> SystemRunner<C> for System<C, T> {
+    fn run(&mut self, ctx: &mut C, components: &Components) {
         let mut iter = components.query::<T>();
         while let Some(item) = iter.next() {
-            (self.f)(item);
+            self.f.run(ctx, item)
         }
     }
 }
+
+pub trait Sys {
+    type Query: Fetch;
+    type Ctx;
+
+    fn run(&self, ctx: &mut Self::Ctx, components: <Self::Query as Fetch>::Data);
+}
+
+
 
