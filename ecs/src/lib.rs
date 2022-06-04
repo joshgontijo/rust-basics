@@ -1,38 +1,41 @@
 #![feature(type_alias_impl_trait)]
 #![feature(associated_type_defaults)]
+#![feature(explicit_generic_args_with_impl_trait)]
 
 extern crate core;
 
 use std::any::{Any, TypeId};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use crate::component::{Component, Components, ComponentsIter, Fetch};
 use crate::entity_builder::{EntityBuilder, EntityId};
 use crate::resource::Resources;
-use crate::system::Systems;
+use crate::system::{Sys, Systems};
 
 mod entity_builder;
-mod system;
-mod component;
+pub mod system;
+pub mod component;
 mod resource;
 
 
 #[derive(Default)]
-pub struct World {
+pub struct World<C> {
     resources: Resources,
     components: Components,
-    systems: Systems,
+    systems: Systems<C>,
 }
 
 
 #[derive(Default)]
-pub struct WorldBuilder {
+pub struct WorldBuilder<C> {
     components: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>,
+    _m: PhantomData<C>,
 }
 
-impl WorldBuilder {
+impl<C> WorldBuilder<C> {
     pub fn register_component<T: Any>(mut self) -> Self {
         let id = TypeId::of::<T>();
         if self.components.contains_key(&id) {
@@ -40,24 +43,28 @@ impl WorldBuilder {
         }
         self.components.insert(id, vec![]);
         WorldBuilder {
-            components: self.components
+            components: self.components,
+            _m: PhantomData,
         }
     }
 
-    pub fn build(self) -> World {
+    pub fn build(self) -> World<C> {
         World {
             components: Components::new(self.components),
             resources: Resources::default(),
-            systems: Systems::default(),
+            systems: Systems { items: Default::default() },
         }
     }
 }
 
-impl World {
-    pub fn builder() -> WorldBuilder {
-        Default::default()
+pub fn builder<C>() -> WorldBuilder<C> {
+    WorldBuilder {
+        components: Default::default(),
+        _m: PhantomData,
     }
+}
 
+impl<C: 'static> World<C> {
     pub fn add_resource<T: Any>(&mut self, resource: T) -> &mut Self {
         self.resources.add_resource(resource);
         self
@@ -83,7 +90,7 @@ impl World {
         };
     }
 
-    
+
     pub fn get_component<T: Any>(&self, entity_id: EntityId) -> Option<Component<T>> {
         self.components.get_component(entity_id)
     }
@@ -92,18 +99,19 @@ impl World {
         self.components.query::<Tuple>()
     }
 
-    fn with_system<T>(&mut self, f: fn(T::Data)) -> &mut Self
+    pub fn with_system<T>(&mut self, f: impl Sys<Query=T, Ctx=C> + 'static) -> &mut Self
         where
-            T: Fetch + 'static
+            T: Fetch + 'static,
+            C: 'static
     {
-        self.systems.add_system::<T>(f);
+        self.systems.add_system::<T>(Box::new(f));
         self
     }
 
-    fn run_systems(&mut self) {
+    pub fn run_systems(&mut self, ctx: &mut C) {
         let components = &self.components;
         for system in self.systems.iter_mut() {
-            system.run(components)
+            system.run(ctx, components)
         }
     }
 }
@@ -121,10 +129,12 @@ mod tests {
     #[derive(Debug, Default, Eq, PartialEq)]
     struct Health(u32);
 
+    #[derive(Debug)]
+    struct Ctx;
 
     #[test]
     fn iter() {
-        let mut world = World::builder()
+        let mut world = builder::<Ctx>()
             .register_component::<Health>()
             .register_component::<Speed>()
             .build();
@@ -151,7 +161,7 @@ mod tests {
 
     #[test]
     fn query() {
-        let mut world = World::builder()
+        let mut world = builder::<Ctx>()
             .register_component::<Health>()
             .register_component::<Speed>()
             .build();
@@ -173,7 +183,7 @@ mod tests {
 
     #[test]
     fn get_components() {
-        let mut world = World::builder()
+        let mut world = builder::<Ctx>()
             .register_component::<Health>()
             .register_component::<Speed>()
             .build();
@@ -192,7 +202,7 @@ mod tests {
     fn test_resource() {
         struct WorldWidth(u32);
 
-        let mut world = World::builder().build();
+        let mut world = builder::<Ctx>().build();
         world.add_resource(WorldWidth(123));
 
         let v = world.get_resource::<WorldWidth>().unwrap().0;
@@ -212,13 +222,21 @@ mod tests {
     }
 
 
-    fn run((speed, health): (Component<Speed>, Component<Health>)) {
-        println!("{speed:?} {health:?}");
+    struct MovementSystem;
+
+    impl Sys for MovementSystem {
+        type Query = (Speed, Health);
+        type Ctx = Ctx;
+
+        fn run(&self, ctx: &mut Self::Ctx, (speed, health): <Self::Query as Fetch>::Data) {
+            println!("{speed:?} - {health:?}")
+        }
     }
+
 
     #[test]
     fn test_run_system() {
-        let mut world = World::builder()
+        let mut world = builder::<Ctx>()
             .register_component::<Health>()
             .register_component::<Speed>()
             .build();
@@ -227,8 +245,17 @@ mod tests {
             .with_component(Health(100))
             .with_component(Speed(1));
 
+        let mut ctx = Ctx;
 
-        world.with_system::<(Speed, Health)>(run);
-        world.run_systems();
+        world.with_system::<(Speed, Health)>(MovementSystem);
+
+        for i in 0..10 {
+            do_something(&mut ctx);
+            world.run_systems(&mut ctx);
+        }
+    }
+
+    fn do_something(ctx: &mut Ctx) {
+        println!("{ctx:?}");
     }
 }
