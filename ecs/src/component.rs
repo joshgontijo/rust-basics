@@ -10,22 +10,19 @@ use crate::{EntityId, World};
 
 #[derive(Default)]
 pub struct Components {
-    entities: usize,
-    items: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>,
+    pub(crate) entities: usize,
+    //TODO use vec<usize> instead, this can cause issues after removing entities
+    pub(crate) items: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
     vacant: VecDeque<usize>,
 }
 
 pub struct Component<T: Any> {
-    inner: Rc<RefCell<dyn Any>>,
+    inner: Box<dyn Any>,
     _m: PhantomData<T>,
 }
 
 
 impl Components {
-    pub(crate) fn new(items: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>) -> Self {
-        Self { entities: 0, items, vacant: VecDeque::default() }
-    }
-
     pub fn new_entity(&mut self) -> EntityId {
         match self.vacant.pop_front() {
             None => { //alocate new one
@@ -61,129 +58,134 @@ impl Components {
 
     pub fn add_component<T: Any>(&mut self, entity_id: EntityId, component: T) {
         let component_vec = self.items.get_mut(&TypeId::of::<T>()).expect("Component type not registered");
-        component_vec.insert(entity_id, Some(Rc::new(RefCell::new(component))));
+        component_vec.insert(entity_id, Some(Box::new(component)));
     }
 
-    pub fn get_component<T: Any>(&self, entity_id: EntityId) -> Option<Component<T>> {
-        self.items.get(&TypeId::of::<T>())
-            .expect("Component not registered")
-            .get(entity_id)
-            .map(|e| {
-                match e {
-                    None => None,
-                    Some(t) => Some(Component::new(Rc::clone(t)))
-                }
-            }).flatten()
-    }
-
-    pub(crate) fn query<Tuple>(&self) -> ComponentsIter<Tuple> {
-        ComponentsIter {
-            entity_idx: 0,
-            components: self,
-            _m: PhantomData,
-        }
-    }
-}
-
-
-pub struct ComponentsIter<'a, Tuple> {
-    entity_idx: usize,
-    components: &'a Components,
-    _m: PhantomData<Tuple>,
-}
-
-impl<'a, Tuple: Fetch> Iterator for ComponentsIter<'a, Tuple> {
-    type Item = Tuple::Data;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let components = &mut self.components;
-        let res = Tuple::fetch(components, self.entity_idx);
-        self.entity_idx += 1;
-        res
-    }
-}
-
-
-impl<T: Any + Debug> Debug for Component<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.as_ref().fmt(f)
-    }
-}
-
-impl<T: Any> Component<T> {
-    fn new(rc: Rc<RefCell<dyn Any>>) -> Self {
-        Self {
-            inner: rc,
-            _m: PhantomData,
+    pub fn get_component<T: Any>(&mut self, entity_id: EntityId) -> Option<&mut T> {
+        let component = self.items.get_mut(&TypeId::of::<T>())
+            .unwrap()
+            .get_mut(entity_id)?;
+        match component {
+            None => None,
+            Some(c) => Some(c.downcast_mut().unwrap())
         }
     }
 
-    fn inner_type(&self) -> TypeId {
-        TypeId::of::<T>()
-    }
-    // fn as_ref(& self) -> impl Deref<Target = T> + '_ {
-    //     Ref::map(self.inner.borrow(), |any| any.downcast_ref::<T>().unwrap())
+    //
+    // pub(crate) fn query<Tuple>(&mut self) -> ComponentsIter<Tuple> {
+    //     ComponentsIter {
+    //         entity_idx: 0,
+    //         components: self,
+    //         _m: PhantomData,
+    //     }
+    // }
+}
+
+
+// pub struct ComponentsIter<'a, Tuple> {
+//     entity_idx: usize,
+//     components: &'a mut Components,
+//     _m: PhantomData<Tuple>,
+// }
+//
+// impl<'a, Tuple: for<'b> Fetch<'b>> Iterator for ComponentsIter<'a, Tuple> {
+//     type Item = <Tuple as Fetch<'a>>::Data;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let components = &mut self.components;
+//         let res = Tuple::fetch(components, self.entity_idx);
+//         self.entity_idx += 1;
+//         res
+//     }
+// }
+
+pub trait Query<'a> {
+    type Data;
+    fn get_component(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data>;
+}
+
+pub trait Fetch<'a> {
+    type Data;
+    fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data>;
+    fn type_info() -> Vec<(TypeId, &'static str)>;
+}
+
+impl<'a, T1, T2> Fetch<'a> for (T1, T2)
+    where
+        T1: Any,
+        T2: Any,
+{
+    type Data = (&'a mut T1, &'a mut T2);
+
+    // fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
+    //     unsafe {
+    //         let t1 = components.get_component::<T1>(entity_id)? as *mut _;
+    //         let t2 = components.get_component::<T2>(entity_id)? as *mut _;
+    //         Some((&mut *t1, &mut *t2))
+    //     }
     // }
 
-    pub fn as_ref(&self) -> Ref<'_, T> {
-        Ref::map(self.inner.borrow(), |any| any.downcast_ref::<T>().unwrap())
+    fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
+        unsafe {
+            Some((
+                &mut *(components.get_component::<T1>(entity_id)? as *mut _),
+                &mut *(components.get_component::<T2>(entity_id)? as *mut _),
+            ))
+        }
     }
 
-    pub fn as_ref_mut(&self) -> RefMut<'_, T> {
-        RefMut::map(self.inner.borrow_mut(), |any| any.downcast_mut::<T>().unwrap())
-    }
-}
-
-
-pub trait Fetch {
-    type Data;
-    fn fetch(components: &Components, idx: usize) -> Option<Self::Data>;
-}
-
-/// Resolves to:
-/// impl<T1, T2> Fetch for (T1, T2)
-///    where
-///       T1: Any,
-///       T2: Any
-///  {
-///      type Data = (Component<T1>, Component<T2>);
-///
-///      fn fetch(world: &World, idx: usize) -> Option<Self::Data> {
-///          Some((world.get_component::<T1>(idx)?, world.get_component::<T2>(idx)?))
-///      }
-///  }
-macro_rules! fetch_tuple {
-
-     ($($ty: ident),*) => {// match like arm for macro
-          impl<$($ty,)*> Fetch for ($($ty,)*)
-            where
-                $(
-                    $ty: Any,
-                )*
-
-         {
-            type Data = ($(Component<$ty>,)*);
-
-            fn fetch(components: &Components, idx: usize) -> Option<Self::Data> {
-                // let t1 = world.get::<T1>(idx);
-                // let t2 = world.get::<T2>(idx);
-                // let res = ( world.get::<T1>(idx)?, world.get::<T2>(idx)?);
-                // return Some(res);
-
-                Some(($(components.get_component::<$ty>(idx)?,)*))
-                }
-         }
+    fn type_info() -> Vec<(TypeId, &'static str)> {
+        vec![
+            (TypeId::of::<T1>(), std::any::type_name::<T1>()),
+            (TypeId::of::<T2>(), std::any::type_name::<T2>()),
+        ]
     }
 }
 
-
-fetch_tuple! {T0}
-fetch_tuple! {T0, T1}
-fetch_tuple! {T0, T1, T2}
-fetch_tuple! {T0, T1, T2, T3}
-fetch_tuple! {T0, T1, T2, T3, T4}
-fetch_tuple! {T0, T1, T2, T3, T4, T5}
-fetch_tuple! {T0, T1, T2, T3, T4, T5, T6}
-fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7}
-fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8}
-fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8, T9}
+// Resolves to:
+// impl<T1, T2> Fetch for (T1, T2)
+//    where
+//       T1: Any,
+//       T2: Any
+//  {
+//      type Data = (Component<T1>, Component<T2>);
+//
+//      fn fetch(world: &World, idx: usize) -> Option<Self::Data> {
+//          Some((world.get_component::<T1>(idx)?, world.get_component::<T2>(idx)?))
+//      }
+//  }
+// macro_rules! fetch_tuple {
+//
+//      ($($ty: ident),*) => {// match like arm for macro
+//           impl<$($ty,)*> Fetch for ($($ty,)*)
+//             where
+//                 $(
+//                     $ty: Any,
+//                 )*
+//
+//          {
+//             type Data = ($(Component<$ty>,)*);
+//
+//             fn fetch(components: &Components, idx: usize) -> Option<Self::Data> {
+//                 // let t1 = world.get::<T1>(idx);
+//                 // let t2 = world.get::<T2>(idx);
+//                 // let res = ( world.get::<T1>(idx)?, world.get::<T2>(idx)?);
+//                 // return Some(res);
+//
+//                 Some(($(components.get_component::<$ty>(idx)?,)*))
+//                 }
+//          }
+//     }
+// }
+//
+//
+// fetch_tuple! {T0}
+// fetch_tuple! {T0, T1}
+// fetch_tuple! {T0, T1, T2}
+// fetch_tuple! {T0, T1, T2, T3}
+// fetch_tuple! {T0, T1, T2, T3, T4}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5, T6}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8, T9}
