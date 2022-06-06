@@ -32,7 +32,7 @@ pub fn builder() -> WorldBuilder {
 
 #[derive(Default)]
 pub struct WorldBuilder {
-    components: HashMap<TypeId, Vec<Option<Rc<RefCell<dyn Any>>>>>,
+    components: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
 }
 
 impl WorldBuilder {
@@ -83,7 +83,7 @@ impl<C: 'static> World<C> {
     }
 
 
-    pub fn get_component<T: Any>(&self, entity_id: EntityId) -> Option<Component<T>> {
+    pub fn get_component<T: Any>(&mut self, entity_id: EntityId) -> Option<&mut T> {
         self.components.get_component(entity_id)
     }
 
@@ -91,16 +91,16 @@ impl<C: 'static> World<C> {
         self.components.query::<Tuple>()
     }
 
-    pub fn with_system<T>(&mut self, f: fn(&mut C, T::Data)) -> &mut Self
-        where
-            T: Fetch + 'static,
+    pub fn with_system<T>(&mut self, f: fn(&mut C, <T as Fetch<'_>>::Data)) -> &mut Self
+        where for<'a>
+            T: Fetch<'a> + 'static,
     {
         self.systems.add_system::<T>(f);
         self
     }
 
     pub fn run_systems(&mut self, ctx: &mut C) {
-        let components = &self.components;
+        let components = &mut self.components;
         for system in self.systems.iter_mut() {
             system.run(ctx, components)
         }
@@ -142,10 +142,10 @@ mod tests {
         });
 
 
-        let a = world.query::<(Health, )>();
-        a.for_each(|e| {
-            println!("{:?}", e)
-        });
+        // let a = world.query::<(Health, )>();
+        // a.for_each(|e| {
+        //     println!("{:?}", e)
+        // });
     }
 
     #[test]
@@ -166,7 +166,7 @@ mod tests {
         let mut query = world.query::<(Speed, Health)>();
 
         while let Some((speed, health)) = query.next() {
-            speed.as_ref_mut().0 += 1
+            speed.0 += 1
         }
     }
 
@@ -184,7 +184,7 @@ mod tests {
 
         let component = world.get_component::<Speed>(0);
         assert!(component.is_some());
-        assert_eq!(component.unwrap().as_ref().0, 1);
+        assert_eq!(component.unwrap().0, 1);
     }
 
     #[test]
@@ -211,7 +211,7 @@ mod tests {
     }
 
 
-    fn run(ctx: &mut Ctx, (speed, health): (Component<Speed>, Component<Health>)) {
+    fn run(ctx: &mut Ctx, (speed, health): (&mut Speed, &mut Health)) {
         println!("{ctx:?} {speed:?} {health:?}");
     }
 
