@@ -1,30 +1,42 @@
 use std::marker::PhantomData;
 use std::slice::{Iter, IterMut};
-use crate::{Components, Fetch, World};
+use crate::{Components, Fetch};
 
-struct System<C, T> where T: Fetch {
-    f: Box<dyn Sys<Query = T, Ctx = C>>,
-    _m: PhantomData<fn() -> T>,
+struct System<C, T>
+    where for<'a>
+          T: Fetch<'a>,
+{
+    f: fn(&mut C, <T as Fetch<'_>>::Data),
+    _m1: PhantomData<T>,
+    _m2: PhantomData<C>,
 }
 
-impl<C, T> System<C, T> where T: Fetch {
-    fn new(f: Box<dyn Sys<Query = T, Ctx = C>>) -> Self {
+impl<C, T> System<C, T>
+    where for<'a>
+          T: Fetch<'a>,
+{
+    fn new(f: fn(&mut C, <T as Fetch<'_>>::Data)) -> Self {
         Self {
             f,
-            _m: PhantomData,
+            _m1: PhantomData::<T>::default(),
+            _m2: PhantomData::<C>::default(),
         }
     }
 }
 
 #[derive(Default)]
 pub struct Systems<C> {
-    pub(crate) items: Vec<Box<dyn SystemRunner<C>>>,
+    pub(crate)items: Vec<Box<dyn SystemRunner<C>>>,
 }
 
 impl<C: 'static> Systems<C> {
-    pub fn add_system<T>(&mut self, f: Box<dyn Sys<Query = T, Ctx = C>>)
-        where
-            T: Fetch + 'static
+    pub fn new() -> Self {
+        Self { items: vec![] }
+    }
+
+    pub fn add_system<T>(&mut self, f: fn(&mut C, <T as Fetch<'_>>::Data))
+        where for<'a>
+              T: Fetch<'a> + 'static,
     {
         let system = System::<C, T>::new(f);
         self.items.push(Box::new(system));
@@ -33,30 +45,23 @@ impl<C: 'static> Systems<C> {
     pub fn iter_mut(&mut self) -> IterMut<'_, Box<dyn SystemRunner<C>>> {
         self.items.iter_mut()
     }
-
 }
 
 pub trait SystemRunner<C> {
-    fn run(&mut self, ctx: &mut C, components: &Components);
+    fn run(&mut self, ctx: &mut C, components: &mut Components);
 }
 
 
-
-impl<C, T: Fetch> SystemRunner<C> for System<C, T> {
-    fn run(&mut self, ctx: &mut C, components: &Components) {
-        let mut iter = components.query::<T>();
-        while let Some(item) = iter.next() {
-            self.f.run(ctx, item)
+impl<C, T> SystemRunner<C> for System<C, T>
+    where for<'a>
+          T: Fetch<'a>,
+{
+    fn run(&mut self, ctx: &mut C, components: &mut Components) {
+        for entity_id in 0..components.entities {
+            if let Some(comp) = T::fetch(components, entity_id) {
+                (self.f)(ctx, comp);
+            }
         }
     }
 }
-
-pub trait Sys {
-    type Query: Fetch;
-    type Ctx;
-
-    fn run(&self, ctx: &mut Self::Ctx, components: <Self::Query as Fetch>::Data);
-}
-
-
 
