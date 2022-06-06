@@ -86,6 +86,19 @@ pub trait Query<'a> {
     fn get_component(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data>;
 }
 
+fn get_mut_ref<T: Any>(components: &mut Components, entity_id: EntityId) -> Option<&mut T> {
+    let item = components.items.get_mut(&TypeId::of::<T>())
+        .unwrap()
+        .get_mut(entity_id)
+        .unwrap();
+
+    match item {
+        None => None,
+        Some(i) => i.downcast_mut()
+    }
+
+}
+
 impl<'a, T1, T2> Query<'a> for (T1, T2)
     where
         T1: Any + PartialEq + Debug,
@@ -94,45 +107,19 @@ impl<'a, T1, T2> Query<'a> for (T1, T2)
     type Data = (&'a mut T1, &'a mut T2);
 
     fn get_component(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
-        //TODO add entity_id bound check
-        unsafe {
-            // let value = components.items.get_mut(&TypeId::of::<T1>()).unwrap().get_mut(entity_id).unwrap();
-            // let g: Option<&mut T1> = match value {
-            //     None => None,
-            //     Some(b) => Some(b.downcast_mut::<T1>().unwrap())
-            // };
-            // let x1 = g.unwrap();
+        Some((
+            get_mut_ref(components, entity_id)?,
+            get_mut_ref(components, entity_id)?
+        ))
 
 
-            let mut a = components.items.get_mut(&TypeId::of::<T1>()).unwrap() as *mut Vec<Option<Box<dyn Any>>>;
-            let mut b = components.items.get_mut(&TypeId::of::<T2>()).unwrap() as *mut Vec<Option<Box<dyn Any>>>;
-            assert_ne!(a, b, "The two keys must not resolve to the same value");
-
-            let avec = (*a).get_mut(entity_id).unwrap();
-            let res1 = match avec {
-                None => None,
-                Some(value) =>  {
-                    let x = value.downcast_mut();
-                    Some(x.unwrap())
-                }
-            };
-
-            let bvec = (*b).get_mut(entity_id).unwrap();
-            let res2 = match bvec {
-                None => None,
-                Some(value) => Some(value.as_mut().downcast_mut::<T2>().unwrap())
-            };
-
-            return Some((res1?, res2?))
-        }
-
-
-        todo!()
         // unsafe {
         //     let a = components.items.get_mut(a).unwrap().get_mut(idx) as *mut _;
         //     let b = components.items.get_mut(b).unwrap() as *mut _;
         //     assert_ne!(a, b, "The two keys must not resolve to the same value");
         //     (&mut *a, &mut *b)
         // }
+
+
     }
 }
