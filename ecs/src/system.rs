@@ -26,7 +26,7 @@ impl<C, T> System<C, T>
 
 #[derive(Default)]
 pub struct Systems<C> {
-    items: Vec<Box<dyn SystemRunner<C>>>,
+    pub(crate)items: Vec<Box<dyn SystemRunner<C>>>,
 }
 
 impl<C: 'static> Systems<C> {

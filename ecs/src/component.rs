@@ -12,7 +12,7 @@ use crate::{EntityId, World};
 pub struct Components {
     pub(crate) entities: usize,
     //TODO use vec<usize> instead, this can cause issues after removing entities
-    items: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
+    pub(crate) items: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
     vacant: VecDeque<usize>,
 }
 
@@ -23,10 +23,6 @@ pub struct Component<T: Any> {
 
 
 impl Components {
-    pub(crate) fn new(items: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>) -> Self {
-        Self { entities: 0, items, vacant: VecDeque::default() }
-    }
-
     pub fn new_entity(&mut self) -> EntityId {
         match self.vacant.pop_front() {
             None => { //alocate new one
@@ -111,7 +107,7 @@ pub trait Query<'a> {
 pub trait Fetch<'a> {
     type Data;
     fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data>;
-    fn types() -> Vec<TypeId>;
+    fn type_info() -> Vec<(TypeId, &'static str)>;
 }
 
 impl<'a, T1, T2> Fetch<'a> for (T1, T2)
@@ -121,18 +117,27 @@ impl<'a, T1, T2> Fetch<'a> for (T1, T2)
 {
     type Data = (&'a mut T1, &'a mut T2);
 
+    // fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
+    //     unsafe {
+    //         let t1 = components.get_component::<T1>(entity_id)? as *mut _;
+    //         let t2 = components.get_component::<T2>(entity_id)? as *mut _;
+    //         Some((&mut *t1, &mut *t2))
+    //     }
+    // }
+
     fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
         unsafe {
-            let t1 = components.get_component::<T1>(entity_id)? as *mut _;
-            let t2 = components.get_component::<T2>(entity_id)? as *mut _;
-            Some((&mut *t1, &mut *t2))
+            Some((
+                &mut *(components.get_component::<T1>(entity_id)? as *mut _),
+                &mut *(components.get_component::<T2>(entity_id)? as *mut _),
+            ))
         }
     }
 
-    fn types() -> Vec<TypeId> {
+    fn type_info() -> Vec<(TypeId, &'static str)> {
         vec![
-            TypeId::of::<T1>(),
-            TypeId::of::<T2>(),
+            (TypeId::of::<T1>(), std::any::type_name::<T1>()),
+            (TypeId::of::<T2>(), std::any::type_name::<T2>()),
         ]
     }
 }
