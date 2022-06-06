@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::component::{Component, Components, ComponentsIter, Fetch};
+use crate::component::{Component, Components, Fetch};
 use crate::entity_builder::{EntityBuilder, EntityId};
 use crate::resource::Resources;
 use crate::system::Systems;
@@ -87,9 +87,9 @@ impl<C: 'static> World<C> {
         self.components.get_component(entity_id)
     }
 
-    pub fn query<Tuple>(&self) -> ComponentsIter<Tuple> {
-        self.components.query::<Tuple>()
-    }
+    // pub fn query<Tuple>(&self) -> ComponentsIter<Tuple> {
+    //     self.components.query::<Tuple>()
+    // }
 
     pub fn with_system<T>(&mut self, f: fn(&mut C, <T as Fetch<'_>>::Data)) -> &mut Self
         where for<'a>
@@ -136,10 +136,10 @@ mod tests {
             .with_component(Health(100));
 
 
-        let a = world.query::<(Speed, Health)>();
-        a.for_each(|(e)| {
-            println!("{:?}", e)
-        });
+        // let a = world.query::<(Speed, Health)>();
+        // a.for_each(|(e)| {
+        //     println!("{:?}", e)
+        // });
 
 
         // let a = world.query::<(Health, )>();
@@ -163,11 +163,11 @@ mod tests {
             .with_component(Speed(1));
 
 
-        let mut query = world.query::<(Speed, Health)>();
-
-        while let Some((speed, health)) = query.next() {
-            speed.0 += 1
-        }
+        // let mut query = world.query::<(Speed, Health)>();
+        //
+        // while let Some((speed, health)) = query.next() {
+        //     speed.0 += 1
+        // }
     }
 
     #[test]
@@ -212,6 +212,7 @@ mod tests {
 
 
     fn run(ctx: &mut Ctx, (speed, health): (&mut Speed, &mut Health)) {
+        speed.0 += 1;
         println!("{ctx:?} {speed:?} {health:?}");
     }
 

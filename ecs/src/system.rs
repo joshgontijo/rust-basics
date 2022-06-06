@@ -13,7 +13,7 @@ struct System<C, T>
 
 impl<C, T> System<C, T>
     where for<'a>
-        T: Fetch<'a>,
+          T: Fetch<'a>,
 {
     fn new(f: fn(&mut C, <T as Fetch<'_>>::Data)) -> Self {
         Self {
@@ -36,7 +36,7 @@ impl<C: 'static> Systems<C> {
 
     pub fn add_system<T>(&mut self, f: fn(&mut C, <T as Fetch<'_>>::Data))
         where for<'a>
-            T: Fetch<'a> + 'static,
+              T: Fetch<'a> + 'static,
     {
         let system = System::<C, T>::new(f);
         self.items.push(Box::new(system));
@@ -48,7 +48,7 @@ impl<C: 'static> Systems<C> {
 }
 
 pub trait SystemRunner<C> {
-    fn run(&mut self, ctx: &mut C, components: &Components);
+    fn run(&mut self, ctx: &mut C, components: &mut Components);
 }
 
 
@@ -56,10 +56,11 @@ impl<C, T> SystemRunner<C> for System<C, T>
     where for<'a>
           T: Fetch<'a>,
 {
-    fn run(&mut self, ctx: &mut C, components: &Components) {
-        let mut iter = components.query::<T>();
-        while let Some(item) = iter.next() {
-            (self.f)(ctx, item);
+    fn run(&mut self, ctx: &mut C, components: &mut Components) {
+        for entity_id in 0..components.entities {
+            if let Some(comp) = T::fetch(components, entity_id) {
+                (self.f)(ctx, comp);
+            }
         }
     }
 }
