@@ -1,87 +1,64 @@
+use std::error::Error;
 use sdl2::pixels::Color;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::render::{WindowCanvas, Texture};
-// "self" imports the "image" module itself as well as everything else we listed
-use sdl2::image::{self, LoadTexture, InitFlag};
-use std::time::Duration;
-use sdl2::rect::{Rect, Point};
+use ecs::World;
+use crate::engine::Engine;
 
-fn render(canvas: &mut WindowCanvas, color: Color, texture: &Texture, position: Point, sprite: Rect) -> Result<(), String> {
-    canvas.set_draw_color(color);
-    canvas.clear();
+mod engine;
 
-    let (width, height) = canvas.output_size()?;
+#[derive(Debug)]
+struct Speed(i32);
 
-    // Treat the center of the screen as the (0, 0) coordinate
-    let screen_position = position + Point::new(width as i32 / 2, height as i32 / 2);
-    let screen_rect = Rect::from_center(screen_position, sprite.width(), sprite.height());
-    canvas.copy(texture, sprite, screen_rect)?;
-
-    canvas.present();
-
-    Ok(())
+#[derive(Debug)]
+struct Tile {
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
 }
 
-fn main() -> Result<(), String> {
-    let sdl_context = sdl2::init()?;
-    let video_subsystem = sdl_context.video()?;
-
-    println!("Init");
-
-    let _image_context = image::init(InitFlag::PNG | InitFlag::JPG)?;
-
-    let window = video_subsystem.window("game tutorial", 800, 600)
-        .position_centered()
-        .resizable()
-        .build()
-        .expect("could not initialize video subsystem");
-
-    let mut canvas = window.into_canvas()
-        .accelerated()
-        .build()
-        .expect("could not make a canvas");
-
-    let texture_creator = canvas.texture_creator();
-    let texture = texture_creator.load_texture("assets/reaper.png")?;
-
-    let speed = 2;
-    let mut position = Point::new(0, 0);
-    // src position in the spritesheet
-    let sprite = Rect::new(0, 0, 36, 36);
-
-    let mut event_pump = sdl_context.event_pump()?;
-    'running: loop {
-        // Handle events
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit {..} | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    break 'running;
-                },
-                Event::KeyDown {keycode: Some(Keycode::W), ..} => {
-                    position = position.offset(0, -speed);
-                },
-                Event::KeyDown {keycode: Some(Keycode::A), ..} => {
-                    position = position.offset(-speed, 0);
-                },
-                Event::KeyDown {keycode: Some(Keycode::S), ..} => {
-                    position = position.offset(0, speed);
-                },
-                Event::KeyDown {keycode: Some(Keycode::D), ..} => {
-                    position = position.offset(speed, 0);
-                },
-                _ => {}
-            }
-        }
-
-        // Update
-
-        // Render
-        render(&mut canvas, Color::BLACK, &texture, position, sprite)?;
-
-        // Time management!
-        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+impl Tile {
+    pub fn new(x: i32, y: i32, w: u32, h: u32) -> Self {
+        Self { x, y, w, h }
     }
+}
 
-    Ok(())
+#[derive(Debug)]
+struct Drawable {
+    color: Color,
+}
+
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut world = ecs::builder()
+        .register_component::<Speed>()
+        .register_component::<Tile>()
+        .register_component::<Drawable>()
+        .build();
+
+
+    let _ = world.new_entity()
+        .with_component(Tile::new(200, 200, 50, 50))
+        .with_component(Drawable { color: Color::CYAN })
+        .id();
+
+
+    Engine::run(world)
+}
+
+mod systems {
+    use sdl2::pixels::Color;
+    use sdl2::rect::Rect;
+    use crate::{Drawable, Tile};
+    use crate::engine::Ctx;
+
+    pub fn render(ctx: &mut Ctx, (tile, drawable, ): (Tile, Drawable, )) {
+        ctx.canvas.set_draw_color(Color::BLACK);
+        ctx.canvas.clear();
+
+        ctx.canvas.set_draw_color(drawable.color);
+        ctx.canvas.draw_rect(Rect::new(tile.x,tile.y, tile.w, tile.h)).unwrap();
+
+        ctx.canvas.present();
+
+    }
 }
