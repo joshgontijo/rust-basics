@@ -3,19 +3,19 @@ use std::slice::{Iter, IterMut};
 use crate::{Components, Fetch};
 
 struct System<C, T>
-    where
-        T: Fetch,
+    where for<'a>
+          T: Fetch<'a>,
 {
-    f: fn(&mut C, T::Data),
+    f: fn(&mut C, <T as Fetch<'_>>::Data),
     _m1: PhantomData<T>,
     _m2: PhantomData<C>,
 }
 
 impl<C, T> System<C, T>
-    where
-        T: Fetch,
+    where for<'a>
+        T: Fetch<'a>,
 {
-    fn new(f: fn(&mut C, T::Data)) -> Self {
+    fn new(f: fn(&mut C, <T as Fetch<'_>>::Data)) -> Self {
         Self {
             f,
             _m1: PhantomData::<T>::default(),
@@ -34,9 +34,9 @@ impl<C: 'static> Systems<C> {
         Self { items: vec![] }
     }
 
-    pub fn add_system<T>(&mut self, f: fn(&mut C, T::Data))
-        where
-            T: Fetch + 'static,
+    pub fn add_system<T>(&mut self, f: fn(&mut C, <T as Fetch<'_>>::Data))
+        where for<'a>
+            T: Fetch<'a> + 'static,
     {
         let system = System::<C, T>::new(f);
         self.items.push(Box::new(system));
@@ -53,8 +53,8 @@ pub trait SystemRunner<C> {
 
 
 impl<C, T> SystemRunner<C> for System<C, T>
-    where
-        T: Fetch,
+    where for<'a>
+          T: Fetch<'a>,
 {
     fn run(&mut self, ctx: &mut C, components: &Components) {
         let mut iter = components.query::<T>();
