@@ -10,7 +10,8 @@ use crate::{EntityId, World};
 
 #[derive(Default)]
 pub struct Components {
-    entities: usize,
+    pub(crate) entities: usize,
+    //TODO use vec<usize> instead, this can cause issues after removing entities
     items: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
     vacant: VecDeque<usize>,
 }
@@ -74,33 +75,33 @@ impl Components {
         }
     }
 
-
-    pub(crate) fn query<Tuple>(&mut self) -> ComponentsIter<Tuple> {
-        ComponentsIter {
-            entity_idx: 0,
-            components: self,
-            _m: PhantomData,
-        }
-    }
+    //
+    // pub(crate) fn query<Tuple>(&mut self) -> ComponentsIter<Tuple> {
+    //     ComponentsIter {
+    //         entity_idx: 0,
+    //         components: self,
+    //         _m: PhantomData,
+    //     }
+    // }
 }
 
 
-pub struct ComponentsIter<'a, Tuple> {
-    entity_idx: usize,
-    components: &'a mut Components,
-    _m: PhantomData<Tuple>,
-}
-
-impl<'a, Tuple: for<'b> Fetch<'b>> Iterator for ComponentsIter<'a, Tuple> {
-    type Item = <Tuple as Fetch<'a>>::Data;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let components = &mut self.components;
-        let res = Tuple::fetch(components, self.entity_idx);
-        self.entity_idx += 1;
-        res
-    }
-}
+// pub struct ComponentsIter<'a, Tuple> {
+//     entity_idx: usize,
+//     components: &'a mut Components,
+//     _m: PhantomData<Tuple>,
+// }
+//
+// impl<'a, Tuple: for<'b> Fetch<'b>> Iterator for ComponentsIter<'a, Tuple> {
+//     type Item = <Tuple as Fetch<'a>>::Data;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let components = &mut self.components;
+//         let res = Tuple::fetch(components, self.entity_idx);
+//         self.entity_idx += 1;
+//         res
+//     }
+// }
 
 pub trait Query<'a> {
     type Data;
@@ -110,6 +111,7 @@ pub trait Query<'a> {
 pub trait Fetch<'a> {
     type Data;
     fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data>;
+    fn types() -> Vec<TypeId>;
 }
 
 impl<'a, T1, T2> Fetch<'a> for (T1, T2)
@@ -125,6 +127,13 @@ impl<'a, T1, T2> Fetch<'a> for (T1, T2)
             let t2 = components.get_component::<T2>(entity_id)? as *mut _;
             Some((&mut *t1, &mut *t2))
         }
+    }
+
+    fn types() -> Vec<TypeId> {
+        vec![
+            TypeId::of::<T1>(),
+            TypeId::of::<T2>(),
+        ]
     }
 }
 
