@@ -4,6 +4,7 @@ use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::process::id;
+use std::ptr;
 use std::rc::Rc;
 
 type EntityId = usize;
@@ -65,13 +66,12 @@ impl Components {
     }
 
     pub fn get_component_mut<T: Any>(&mut self, entity_id: EntityId) -> Option<&mut T> {
-        let vec = self.items.get_mut(&TypeId::of::<T>())?;
-        let component = vec.get_mut(entity_id)?;
+        let component = self.items.get_mut(&TypeId::of::<T>())
+            .unwrap()
+            .get_mut(entity_id)?;
         match component {
             None => None,
-            Some(c) => {
-                Some(c.downcast_mut::<T>()).unwrap()
-            }
+            Some(c) => Some(c.downcast_mut().unwrap())
         }
     }
 
@@ -86,31 +86,26 @@ pub trait Query<'a> {
     fn get_component(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data>;
 }
 
-fn get_mut_ref<T: Any>(components: &mut Components, entity_id: EntityId) -> Option<&mut T> {
-    let item = components.items.get_mut(&TypeId::of::<T>())
-        .unwrap()
-        .get_mut(entity_id)
-        .unwrap();
-
-    match item {
-        None => None,
-        Some(i) => i.downcast_mut()
-    }
-
-}
-
 impl<'a, T1, T2> Query<'a> for (T1, T2)
     where
-        T1: Any + PartialEq + Debug,
-        T2: Any + PartialEq + Debug,
+        T1: Any,
+        T2: Any,
 {
     type Data = (&'a mut T1, &'a mut T2);
 
     fn get_component(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
-        Some((
-            get_mut_ref(components, entity_id)?,
-            get_mut_ref(components, entity_id)?
-        ))
+        unsafe {
+            let t1 = components.get_component_mut::<T1>(entity_id)? as *mut _;
+            let t2 = components.get_component_mut::<T2>(entity_id)? as *mut _;
+            Some((&mut *t1, &mut *t2))
+        }
+        // unsafe {
+        //     get_mut_ref(components, entity_id)?
+        //     let a = components.items.get_mut(a).unwrap().get_mut(idx) as *mut _;
+        //     let b = components.items.get_mut(b).unwrap() as *mut _;
+        //     assert_ne!(a, b, "The two keys must not resolve to the same value");
+        //     (&mut *a, &mut *b)
+        // }
 
 
         // unsafe {
@@ -119,7 +114,5 @@ impl<'a, T1, T2> Query<'a> for (T1, T2)
         //     assert_ne!(a, b, "The two keys must not resolve to the same value");
         //     (&mut *a, &mut *b)
         // }
-
-
     }
 }
