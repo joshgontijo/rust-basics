@@ -13,7 +13,7 @@ impl<C> Systems<C> {
         Self { items: vec![] }
     }
 
-    pub fn add_system<T, F>(&mut self, f: &F)
+    pub fn add_system<T, F>(&mut self, f: F)
         where for<'a>
               T: Fetch<'a>,
               F: Fn(&mut C, <T as Fetch<'_>>::Data)
