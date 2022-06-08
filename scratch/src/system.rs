@@ -19,7 +19,8 @@ impl<C> Systems<C> {
               F: Fn(&mut C, <T as Fetch<'_>>::Data)
     {
         let system = System::<C, T, F>::new(f);
-        self.items.push(Box::new(system));
+        let boxed = Box::new(system);
+        self.items.push(boxed);
     }
 
     pub fn iter_mut(&mut self) -> IterMut<'_, Box<dyn SystemRunner<C>>> {
