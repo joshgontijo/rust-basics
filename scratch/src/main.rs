@@ -1,23 +1,28 @@
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
-use crate::component::{Component, Components};
+use crate::component::Components;
+use crate::system::Systems;
 
+mod system;
 mod component;
 
+pub type EntityId = usize;
+
+struct Ctx<'a> {
+    value: &'a str
+}
 
 fn main() {
-    let mut items = HashMap::<TypeId, Vec<Option<Box<dyn Any>>>>::new();
-    items.insert(TypeId::of::<u32>(), vec![Some(Box::new(123u32))]);
-    items.insert(TypeId::of::<String>(), vec![Some(Box::new("ABC".to_string()))]);
 
-    let mut components = Components::new(items);
+    let val = "a".to_string();
 
-    let found = components.query::<(u32, String)>(0);
-    println!("{found:?}");
+    let mut ctx = Ctx {
+        value: val.as_str()
+    };
 
-    let (int, string) = found.unwrap();
+    let mut components = Components::default();
+    let mut systems = Systems::<Ctx>::new();
 
-    *int = 2;
-
+    for system in systems.iter_mut() {
+        system.run(&mut ctx, &mut components);
+    }
 
 }
