@@ -4,15 +4,15 @@ use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::process::id;
-use std::ptr;
 use std::rc::Rc;
+use crate::EntityId;
 
-type EntityId = usize;
 
 #[derive(Default)]
 pub struct Components {
-    entities: usize,
-    items: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
+    pub(crate) entities: usize,
+    //TODO use vec<usize> instead, this can cause issues after removing entities
+    pub(crate) items: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>,
     vacant: VecDeque<usize>,
 }
 
@@ -23,10 +23,6 @@ pub struct Component<T: Any> {
 
 
 impl Components {
-    pub(crate) fn new(items: HashMap<TypeId, Vec<Option<Box<dyn Any>>>>) -> Self {
-        Self { entities: 0, items, vacant: VecDeque::default() }
-    }
-
     pub fn new_entity(&mut self) -> EntityId {
         match self.vacant.pop_front() {
             None => { //alocate new one
@@ -65,7 +61,7 @@ impl Components {
         component_vec.insert(entity_id, Some(Box::new(component)));
     }
 
-    pub fn get_component_mut<T: Any>(&mut self, entity_id: EntityId) -> Option<&mut T> {
+    pub fn get_component<T: Any>(&mut self, entity_id: EntityId) -> Option<&mut T> {
         let component = self.items.get_mut(&TypeId::of::<T>())
             .unwrap()
             .get_mut(entity_id)?;
@@ -75,44 +71,121 @@ impl Components {
         }
     }
 
-    pub fn query<'a, Q: Query<'a>>(&'a mut self, entity_id: EntityId) -> Option<Q::Data> {
-        Q::get_component(self, entity_id)
-    }
+    //
+    // pub(crate) fn query<Tuple>(&mut self) -> ComponentsIter<Tuple> {
+    //     ComponentsIter {
+    //         entity_idx: 0,
+    //         components: self,
+    //         _m: PhantomData,
+    //     }
+    // }
 }
 
+
+// pub struct ComponentsIter<'a, Tuple> {
+//     entity_idx: usize,
+//     components: &'a mut Components,
+//     _m: PhantomData<Tuple>,
+// }
+//
+// impl<'a, Tuple: for<'b> Fetch<'b>> Iterator for ComponentsIter<'a, Tuple> {
+//     type Item = <Tuple as Fetch<'a>>::Data;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let components = &mut self.components;
+//         let res = Tuple::fetch(components, self.entity_idx);
+//         self.entity_idx += 1;
+//         res
+//     }
+// }
 
 pub trait Query<'a> {
     type Data;
     fn get_component(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data>;
 }
 
-impl<'a, T1, T2> Query<'a> for (T1, T2)
+pub trait Fetch<'a> {
+    type Data;
+    fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data>;
+    fn type_info() -> Vec<(TypeId, &'static str)>;
+}
+
+impl<'a, T1, T2> Fetch<'a> for (T1, T2)
     where
         T1: Any,
         T2: Any,
 {
     type Data = (&'a mut T1, &'a mut T2);
 
-    fn get_component(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
+    // fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
+    //     unsafe {
+    //         let t1 = components.get_component::<T1>(entity_id)? as *mut _;
+    //         let t2 = components.get_component::<T2>(entity_id)? as *mut _;
+    //         Some((&mut *t1, &mut *t2))
+    //     }
+    // }
+
+    fn fetch(components: &'a mut Components, entity_id: EntityId) -> Option<Self::Data> {
         unsafe {
-            let t1 = components.get_component_mut::<T1>(entity_id)? as *mut _;
-            let t2 = components.get_component_mut::<T2>(entity_id)? as *mut _;
-            Some((&mut *t1, &mut *t2))
+            Some((
+                &mut *(components.get_component::<T1>(entity_id)? as *mut _),
+                &mut *(components.get_component::<T2>(entity_id)? as *mut _),
+            ))
         }
-        // unsafe {
-        //     get_mut_ref(components, entity_id)?
-        //     let a = components.items.get_mut(a).unwrap().get_mut(idx) as *mut _;
-        //     let b = components.items.get_mut(b).unwrap() as *mut _;
-        //     assert_ne!(a, b, "The two keys must not resolve to the same value");
-        //     (&mut *a, &mut *b)
-        // }
+    }
 
-
-        // unsafe {
-        //     let a = components.items.get_mut(a).unwrap().get_mut(idx) as *mut _;
-        //     let b = components.items.get_mut(b).unwrap() as *mut _;
-        //     assert_ne!(a, b, "The two keys must not resolve to the same value");
-        //     (&mut *a, &mut *b)
-        // }
+    fn type_info() -> Vec<(TypeId, &'static str)> {
+        vec![
+            (TypeId::of::<T1>(), std::any::type_name::<T1>()),
+            (TypeId::of::<T2>(), std::any::type_name::<T2>()),
+        ]
     }
 }
+
+// Resolves to:
+// impl<T1, T2> Fetch for (T1, T2)
+//    where
+//       T1: Any,
+//       T2: Any
+//  {
+//      type Data = (Component<T1>, Component<T2>);
+//
+//      fn fetch(world: &World, idx: usize) -> Option<Self::Data> {
+//          Some((world.get_component::<T1>(idx)?, world.get_component::<T2>(idx)?))
+//      }
+//  }
+// macro_rules! fetch_tuple {
+//
+//      ($($ty: ident),*) => {// match like arm for macro
+//           impl<$($ty,)*> Fetch for ($($ty,)*)
+//             where
+//                 $(
+//                     $ty: Any,
+//                 )*
+//
+//          {
+//             type Data = ($(Component<$ty>,)*);
+//
+//             fn fetch(components: &Components, idx: usize) -> Option<Self::Data> {
+//                 // let t1 = world.get::<T1>(idx);
+//                 // let t2 = world.get::<T2>(idx);
+//                 // let res = ( world.get::<T1>(idx)?, world.get::<T2>(idx)?);
+//                 // return Some(res);
+//
+//                 Some(($(components.get_component::<$ty>(idx)?,)*))
+//                 }
+//          }
+//     }
+// }
+//
+//
+// fetch_tuple! {T0}
+// fetch_tuple! {T0, T1}
+// fetch_tuple! {T0, T1, T2}
+// fetch_tuple! {T0, T1, T2, T3}
+// fetch_tuple! {T0, T1, T2, T3, T4}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5, T6}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8}
+// fetch_tuple! {T0, T1, T2, T3, T4, T5, T6, T7, T8, T9}

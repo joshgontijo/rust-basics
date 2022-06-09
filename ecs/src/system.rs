@@ -1,50 +1,28 @@
 use std::marker::PhantomData;
-use std::slice::{Iter, IterMut};
 use crate::{Components, Fetch};
 
-struct System<C, T>
-    where for<'a>
-          T: Fetch<'a>,
-{
-    f: fn(&mut C, <T as Fetch<'_>>::Data),
-    _m1: PhantomData<T>,
-    _m2: PhantomData<C>,
+pub(crate) struct System<F, T> {
+    pub(crate) f: F,
+    pub(crate) t: PhantomData<fn(T)>,
+
 }
 
-impl<C, T> System<C, T>
-    where for<'a>
-          T: Fetch<'a>,
-{
-    fn new(f: fn(&mut C, <T as Fetch<'_>>::Data)) -> Self {
-        Self {
-            f,
-            _m1: PhantomData::<T>::default(),
-            _m2: PhantomData::<C>::default(),
-        }
-    }
-}
+// impl<C, T> System<C, T>
+//     where for<'a>
+//           T: Fetch<'a>,
+// {
+//     pub(crate) fn new(f: fn(&mut C, <T as Fetch<'_>>::Data)) -> Self {
+//         Self {
+//             f,
+//             _m1: PhantomData::<T>::default(),
+//             _m2: PhantomData::<C>::default(),
+//         }
+//     }
+// }
 
 #[derive(Default)]
 pub struct Systems<C> {
-    pub(crate)items: Vec<Box<dyn SystemRunner<C>>>,
-}
-
-impl<C: 'static> Systems<C> {
-    pub fn new() -> Self {
-        Self { items: vec![] }
-    }
-
-    pub fn add_system<T>(&mut self, f: fn(&mut C, <T as Fetch<'_>>::Data))
-        where for<'a>
-              T: Fetch<'a> + 'static,
-    {
-        let system = System::<C, T>::new(f);
-        self.items.push(Box::new(system));
-    }
-
-    pub fn iter_mut(&mut self) -> IterMut<'_, Box<dyn SystemRunner<C>>> {
-        self.items.iter_mut()
-    }
+    pub(crate) items: Vec<Box<dyn SystemRunner<C>>>,
 }
 
 pub trait SystemRunner<C> {
@@ -52,9 +30,10 @@ pub trait SystemRunner<C> {
 }
 
 
-impl<C, T> SystemRunner<C> for System<C, T>
-    where for<'a>
-          T: Fetch<'a>,
+impl<C, F, T> SystemRunner<C> for System<F, T>
+    where
+            for<'a> T: Fetch<'a>,
+            for<'a> F: Fn(&mut C, <T as Fetch<'_>>::Data)
 {
     fn run(&mut self, ctx: &mut C, components: &mut Components) {
         for entity_id in 0..components.entities {
