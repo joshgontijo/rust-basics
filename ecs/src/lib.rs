@@ -1,14 +1,15 @@
-#![feature(type_alias_impl_trait)]
-#![feature(associated_type_defaults)]
+#![feature(explicit_generic_args_with_impl_trait)]
 
 extern crate core;
 
 use std::any::{Any};
+use std::collections::HashMap;
+use std::marker::PhantomData;
 
 use crate::component::{Components, Fetch};
 use crate::entity_builder::{EntityBuilder, EntityId};
 use crate::resource::Resources;
-use crate::system::{System, Systems};
+use crate::system::{System, Systems, Type};
 
 mod entity_builder;
 mod system;
@@ -27,7 +28,7 @@ pub fn builder<C>() -> WorldBuilder<C> {
     WorldBuilder {
         components: Default::default(),
         systems: Systems {
-            items: vec![]
+            items: HashMap::new()
         },
     }
 }
@@ -39,10 +40,10 @@ pub struct WorldBuilder<C> {
 }
 
 impl<C> WorldBuilder<C> {
-    pub fn with_system<F, T>(mut self, f: F) -> Self
+    pub fn with_system<T>(mut self, system_type: Type, f: impl Fn(&mut C, <T as Fetch<'_>>::Data) + 'static) -> Self
         where
                 for<'a> T: Fetch<'a> + 'static,
-                for<'a> F: Fn(&mut C, <T as Fetch<'_>>::Data) + 'static
+                // for<'a> F: Fn(&mut C, <T as Fetch<'_>>::Data) + 'static
     {
         for (id, name) in T::type_info() {
             if !self.components.items.contains_key(&id) {
@@ -53,12 +54,13 @@ impl<C> WorldBuilder<C> {
 
         let system = System {
             f,
-            t: Default::default(),
-            // _m2: Default::default(),
+            t: PhantomData,
         };
 
-        let x = Box::new(system);
-        self.systems.items.push(x);
+        self.systems.items.entry(system_type)
+            .or_insert_with(Vec::new)
+            .push(Box::new(system));
+
         self
     }
 
@@ -98,16 +100,16 @@ impl<C> World<C> {
         };
     }
 
-
     pub fn get_component<T: Any>(&mut self, entity_id: EntityId) -> Option<&mut T> {
         self.components.get_component(entity_id)
     }
 
-
-    pub fn run_systems(&mut self, ctx: &mut C) {
+    pub fn run_systems(&mut self, system_type: Type, ctx: &mut C) {
         let components = &mut self.components;
-        for system in self.systems.items.iter_mut() {
-            system.run(ctx, components)
+        if let Some(systems) = self.systems.items.get_mut(&system_type) {
+            for system in systems.iter_mut() {
+                system.run(ctx, components)
+            }
         }
     }
 }
@@ -158,13 +160,13 @@ mod tests {
 
     #[derive(Debug)]
     struct Ctx<'a> {
-        t: PhantomData<&'a ()>
+        t: PhantomData<&'a ()>,
     }
 
     #[test]
     fn test_run_system() {
         let mut world = builder()
-            .with_system::<_, (Speed, Health)>(run)
+            .with_system::<(Speed, Health)>(Type::Default, run)
             .build();
 
         world.new_entity()
@@ -172,6 +174,6 @@ mod tests {
             .with_component(Speed(1));
 
         let mut ctx = Ctx { t: PhantomData };
-        world.run_systems(&mut ctx);
+        world.run_systems(Type::Default, &mut ctx);
     }
 }

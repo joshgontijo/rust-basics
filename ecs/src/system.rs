@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use crate::{Components, Fetch};
 
@@ -6,6 +7,15 @@ pub(crate) struct System<F, T> {
     pub(crate) t: PhantomData<fn(T)>,
 
 }
+
+
+#[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
+pub enum Type {
+    Default,
+    Render,
+    Custom(&'static str),
+}
+
 
 // impl<C, T> System<C, T>
 //     where for<'a>
@@ -22,7 +32,7 @@ pub(crate) struct System<F, T> {
 
 #[derive(Default)]
 pub struct Systems<C> {
-    pub(crate) items: Vec<Box<dyn SystemRunner<C>>>,
+    pub(crate) items: HashMap<Type, Vec<Box<dyn SystemRunner<C>>>>,
 }
 
 pub trait SystemRunner<C> {
