@@ -6,6 +6,7 @@ extern crate core;
 use std::any::{Any, TypeId};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use crate::component::{Component, Components, Fetch};
@@ -53,7 +54,14 @@ impl<C: 'static> WorldBuilder<C> {
             }
         }
 
-        self.systems.add_system::<T>(f);
+        let system = system::System {
+            f,
+            _m1: PhantomData,
+            _m2: PhantomData
+        };
+
+        self.systems.items.push(Box::new(system));
+
         self
     }
 
@@ -67,7 +75,7 @@ impl<C: 'static> WorldBuilder<C> {
     }
 }
 
-impl<C: 'static> World<C> {
+impl<C> World<C> {
     pub fn add_resource<T: Any>(&mut self, resource: T) -> &mut Self {
         self.resources.add_resource(resource);
         self
@@ -98,23 +106,9 @@ impl<C: 'static> World<C> {
         self.components.get_component(entity_id)
     }
 
-    // pub fn query<Tuple>(&self) -> ComponentsIter<Tuple> {
-    //     self.components.query::<Tuple>()
-    // }
-
-    pub fn with_system<T>(&mut self, f: fn(&mut C, <T as Fetch<'_>>::Data)) -> &mut Self
-        where for<'a>
-              T: Fetch<'a> + 'static,
-    {
-        self.systems.add_system::<T>(f);
-        self
-    }
-
     pub fn run_systems(&mut self, ctx: &mut C) {
         let components = &mut self.components;
-        for system in self.systems.iter_mut() {
-            system.run(ctx, components)
-        }
+        self.systems.run(ctx, components);
     }
 }
 
@@ -162,7 +156,9 @@ mod tests {
     }
 
     #[derive(Debug)]
-    struct Ctx(u32);
+    struct Ctx<'a> {
+        _m1: PhantomData<&'a ()>
+    }
 
     #[test]
     fn test_run_system() {
@@ -174,8 +170,7 @@ mod tests {
             .with_component(Health(100))
             .with_component(Speed(1));
 
-        let mut ctx = Ctx(1);
-        world.with_system::<(Speed, Health)>(run);
+        let mut ctx = Ctx { _m1: PhantomData };
         world.run_systems(&mut ctx);
     }
 }
