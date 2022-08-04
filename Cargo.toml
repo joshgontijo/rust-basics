@@ -21,6 +21,6 @@ members = [
     "extension-methods",
     "ecs",
     "declarative-macros",
-    "event_server",
+    "event-server",
 #    "bindgen-test", //commented out as it's broken atm
 ]
