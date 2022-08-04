@@ -9,9 +9,6 @@ edition = "2018"
 [dependencies]
 ecs = {path = "../ecs"}
 
-[dependencies]
-ecs = { path = "../ecs" }
-
 [dependencies.sdl2]
 version = "0.35"
 default-features = false

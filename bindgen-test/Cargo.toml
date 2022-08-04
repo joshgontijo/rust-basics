@@ -1,0 +1,8 @@
+[package]
+name = "bindgen-test"
+version = "0.1.0"
+
+[build-dependencies]
+bindgen = "0.60.1"
+
+[dependencies]

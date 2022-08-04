@@ -20,7 +20,7 @@ fn print<T: Debug>(t: T) {
 
 
 fn main() {
-    let (sender, recv) = completableFuture();
+    let (sender, recv) = completable_future();
 
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(2000));
@@ -33,7 +33,7 @@ fn main() {
     println!("RESULT: {:?}", x);
 }
 
-fn completableFuture<T>() -> (Sender<T>, Receiver<T>) {
+fn completable_future<T>() -> (Sender<T>, Receiver<T>) {
     let arc = Arc::new((Mutex::default(), Condvar::default()));
 
     let sender = Sender {

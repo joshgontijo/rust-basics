@@ -1,10 +1,11 @@
 use std::any::{Any};
-use crate::Components;
+use crate::component::Components;
+
 
 pub type EntityId = usize;
 
 pub struct EntityBuilder<'a> {
-    pub id: EntityId,
+    pub(crate) id: EntityId,
     pub(crate) components: &'a mut Components,
 }
 

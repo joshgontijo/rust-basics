@@ -1,9 +1,5 @@
 fn main() {}
 
-///RefCell -> Rwlock
-///Rc -> Arc
-///
-///
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;

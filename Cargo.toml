@@ -12,7 +12,7 @@ members = [
     "closure",
     "gat",
     "object_pool",
-    "sdl-test",
+#    "sdl-test", //commented out because it requries vcpkg for whoever is building it
     "gat",
     "anymap",
     "condvar_sync",
@@ -21,4 +21,6 @@ members = [
     "extension-methods",
     "ecs",
     "declarative-macros",
+    "event_server",
+#    "bindgen-test", //commented out as it's broken atm
 ]

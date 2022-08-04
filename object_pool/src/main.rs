@@ -1,12 +1,6 @@
-use std::borrow::{Borrow, BorrowMut, Cow};
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
-use std::fs::File;
 use std::mem::ManuallyDrop;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex};
-use std::thread;
-
+use std::sync::Mutex;
 
 fn main() {
     let pool = Pool::new(1, || Vec::<u32>::new());

@@ -1,18 +1,6 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-#[derive(Debug)]
-struct MyStruct1 {
-    v: i32,
-}
-
-#[derive(Debug)]
-struct MyStruct2 {
-    v: i32,
-}
-
-
-
 pub struct AnyMap {
     map: HashMap<TypeId, Box<dyn Any>>,
 }
@@ -41,6 +29,17 @@ impl AnyMap {
 mod tests {
     use super::*;
 
+    #[derive(Debug)]
+    struct MyStruct1 {
+        v: i32,
+    }
+
+    #[derive(Debug)]
+    struct MyStruct2 {
+        v: i32,
+    }
+    
+    
     #[test]
     fn test() {
 
