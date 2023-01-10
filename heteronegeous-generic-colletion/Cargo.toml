@@ -1,0 +1,5 @@
+[package]
+name = "heteronegeous-generic-colletion"
+version = "0.1.0"
+
+[dependencies]
