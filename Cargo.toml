@@ -1,4 +1,7 @@
 [workspace]
+resolver = "2"
+
+
 members = [
     "threadpool",
     "modules",
@@ -22,6 +25,5 @@ members = [
     "ecs",
     "declarative-macros",
     "event-server",
-    "bindgen-test",
     "heteronegeous-generic-colletion"
 ]

@@ -1,6 +1,5 @@
 use std::borrow::Borrow;
-use std::collections::{HashMap, BTreeMap};
-use std::sync::RwLock;
+use std::collections::HashMap;
 
 fn main() {
     let user = User { age: 10 };

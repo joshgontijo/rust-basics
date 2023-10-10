@@ -1,17 +1,7 @@
 use std::borrow::Borrow;
-use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
-use std::collections::vec_deque::VecDeque;
 use std::fmt::Debug;
-use std::future::Future;
-use std::ops::Deref;
-use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::{Arc, Condvar, mpsc, Mutex};
-use std::sync::atomic::Ordering::AcqRel;
-use std::task::{Context, Poll, Waker};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
-use std::thread::{Thread, ThreadId};
 use std::time::Duration;
 
 fn print<T: Debug>(t: T) {
