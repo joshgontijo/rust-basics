@@ -24,6 +24,9 @@ struct FileIterator<R: Read> {
     buff: Rc<Box<[u8]>>,
 }
 
+//A simple and easy way to get around the 'Streaming iterator' problem with Rust
+//This allows to return a Rc<T> which gives flexibility on the consumer side,
+//If the entry is hold for longer than the lifetime of `next` then a new instance of that type is initialised
 impl<R> Iterator for FileIterator<R> where R: Read {
     type Item = Rc<Box<[u8]>>;
 
