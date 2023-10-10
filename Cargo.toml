@@ -28,4 +28,5 @@ members = [
     "bindgen-test",
     "heteronegeous-generic-colletion",
     "atomicptr",
+    "lending-iterator"
 ]

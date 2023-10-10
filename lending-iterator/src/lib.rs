@@ -8,22 +8,15 @@ trait LendingIterator {
 
     fn next<'a>(&'a mut self) -> Option<Self::Item<'a>>;
 
-    fn map<B, F>(self, f: F) -> Map<Self, F>
+
+    fn map<F>(self, f: F) -> Map<Self, F>
         where
             Self: Sized,
-            F:  for<'a> FnMut(Self::Item<'a>) -> B,
-    {
-        Map {
-            iter: self,
-            f,
-        }
-    }
-
-
-    fn map_lending<F>(self, f: F) -> Map<Self, F>
-        where
-            Self: Sized,
+            //`SingleArgFnMut` is just the lifetime of the input can be mapped to what the output is on the type system
+            // having a FnMut(T) -> R would not work as the compiler wouldn't be able to
+            // F: for<'a> FnMut(Self::Item<'a>) -> R,
             F: for<'a> SingleArgFnMut<Self::Item<'a>>,
+
     {
         Map {
             iter: self,
@@ -185,15 +178,16 @@ mod tests {
         };
 
 
-        let mut mapped = it.map_lending(|v| v);
+        let mut mapped = it.map(bypass);
+        //Does not work
+        // let mut mapped = it.map(|v| v);
 
         while let Some(value) = mapped.next() {
             println!("{:?}", value);
         }
     }
 
-    fn do_something(v: &[u8]) -> &[u8] {
+    fn bypass(v: &[u8]) -> &[u8] {
         v
     }
-
 }
