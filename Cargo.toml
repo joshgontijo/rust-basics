@@ -25,5 +25,7 @@ members = [
     "ecs",
     "declarative-macros",
     "event-server",
-    "heteronegeous-generic-colletion"
+    "bindgen-test",
+    "heteronegeous-generic-colletion",
+    "atomicptr",
 ]
